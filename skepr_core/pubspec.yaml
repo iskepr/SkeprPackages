@@ -1,7 +1,7 @@
 name: skepr_core
 description: "A new Flutter package project."
 version: 0.0.1
-homepage:
+homepage: https://github.com/iskepr/SkeprPackages/tree/master/skepr_core
 
 environment:
   sdk: ^3.12.2
