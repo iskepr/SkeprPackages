@@ -1,0 +1,65 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+    exclude:
+        - "lib/generated/**"
+        - "**.g.dart"
+        - build/**
+        - android/**
+        - ios/**
+        - web/**
+        - windows/**
+        - macos/**
+        - linux/**
+
+    errors:
+        # أي إمبورت زيادة يدي إيرور أحمر فوراً عشان يتمسح ونوفر سطور
+        unused_import: warning
+        # المتغيرات اللي متعرفة ومش مستخدمة تدي تحذير أصفر
+        unused_local_variable: warning
+        # الكود اللي مستحيل يتنفذ (زي كود بعد return) يدي تحذير
+        dead_code: warning
+        # تجاهل التحذيرات بتاعة الأكواد القديمة (Deprecated) عشان متوقفش الشغل
+        deprecated_member_use: ignore
+        # نمنع الـ print العادية عشان ماسورة الـ logs متتسدش
+        avoid_print: warning
+        unrelated_type_equality_checks: warning
+        invalid_use_of_protected_member: ignore
+
+linter:
+    rules:
+        # --- تنظيم وترتيب الإمبورتس (Imports) ---
+        - directives_ordering # ترتيب الإمبورتس (فلاتر أولاً، ثم المكتبات، ثم ملفاتك)
+        - always_use_package_imports # استخدام مسارات نسبية (../) بدل اسم الباكدج الطويل لتوفير مساحة السطور
+
+        # --- العظمة في تقليل عدد الأسطر ---
+        - use_super_parameters # (مهمة جداً) بتخلي الـ constructor سطر واحد بدل ما تكرر تعريف الـ key
+        - unnecessary_this # مسح كلمة this طالما ملهاش لازمة عشان الكود يبقى أنظف
+        - unnecessary_new # مسح كلمة new لأن دارت مش محتاجاها أصلاً
+        - prefer_is_empty # استخدام .isEmpty بدل .length == 0 (أسرع وأقصر)
+        - prefer_is_not_empty # استخدام .isNotEmpty بدل .length != 0
+        - avoid_unnecessary_containers # مسح الـ Container لو مستخدمه بس عشان اللون أو الـ child (استخدم Padding أو SizedBox)
+        - sized_box_for_whitespace # استخدام SizedBox بدل Container لو عايز مساحة فاضية بس
+        - unnecessary_string_interpolations # مسح الـ ${} لو بتطبع متغير String لوحده
+        - prefer_collection_literals # استخدام [] و {} بدل List() و Map()
+
+        # --- الأداء والسرعة (Performance) ---
+        - prefer_const_constructors # إجبارك على الـ const عشان فلاتر ميعيدش بناء الـ Widget لو ثابتة
+        - prefer_const_declarations # أي متغير ثابت خليه const عشان يوفر في الرامات
+        - prefer_const_constructors_in_immutables # الـ Widgets اللي مبيتغيرش داتا فيها لازم الـ constructor بتاعها يبقى const
+        - prefer_const_literals_to_create_immutables # القوائم (Lists) الثابتة لازم تبقى const
+        - always_declare_return_types
+
+        # --- الستايل الموحد والنظافة ---
+        - unnecessary_parenthesis # هيشيل الأقواس الزيادة تلقائياً زي
+        - unnecessary_await_in_return
+        - unnecessary_breaks
+        - unnecessary_async
+        - unnecessary_const
+        - prefer_double_quotes # إجبار استخدام علامات التنصيص المزدوجة "" زي ما إنت طلبت
+        - require_trailing_commas # إجبار وضع الفاصلة في آخر عنصر عشان الـ auto-format يخلي الكود طولي ومنظم
+        - sort_child_properties_last # خلي الـ child دايماً آخر خاصية في الـ Widget عشان تعرف تقرأ الكود
+        - prefer_final_fields # أي خاصية في الكلاس مش بتتغير خليها final عشان الأمان والأداء
+        - prefer_final_locals # أي متغير محلي مش هيتغير خليه final
+        - avoid_empty_else # لو الـ else فاضية امسحها، متبقاش مبذر
+        - use_build_context_synchronously # التأكد إن الـ context لسه موجود قبل ما تستخدمه بعد الـ await (عشان الكراشات)

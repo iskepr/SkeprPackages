@@ -1,0 +1,19 @@
+{
+  "codeBySkepr": "بَرْمَجَة مُحَمّد سِيّد",
+  "hoursCount": "{count, plural, zero{} one{ساعة} two{ساعتين} few{{count} ساعات} many{{count} ساعة} other{{count} ساعة}}",
+  "minutesCount": "{count, plural, zero{} one{دقيقة} two{دقيقتين} few{{count} دقائق} many{{count} دقيقة} other{{count} دقيقة}}",
+  "and": "و",
+  "notSpecified": "لم يحدد",
+  "nothing": "لا يوجد",
+  "search":"بحث",
+  "confirm": "تأكيد",
+  "edit": "تعديل",
+  "cancel": "إلغاء",
+  "close": "إغلاق",
+  "save": "حفظ",
+  "delete": "حذف",
+  "areYouSure": "هل انت متاكد؟",
+  "done":"تم",
+  "sortBy": "ترتيب حسب",
+  "refresh": "تحديث"
+}

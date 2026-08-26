@@ -1,0 +1,19 @@
+{
+  "codeBySkepr": "Code By Skepr",
+  "hoursCount": "{count, plural, zero{} one{1 hour} other{{count} hours}}",
+  "minutesCount": "{count, plural, zero{} one{1 minute} other{{count} minutes}}",
+  "and": "and",
+  "notSpecified": "Not specified",
+  "nothing": "Nothing",
+  "search": "Search",
+  "confirm": "Confirm",
+  "edit": "Edit",
+  "cancel": "Cancel",
+  "close": "Close",
+  "save": "Save",
+  "delete": "Delete",
+  "areYouSure": "Are you sure?",
+  "done": "Done",
+  "sortBy": "Sort By",
+  "refresh": "Refresh"
+}
