@@ -1,39 +1,76 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Skepr Core
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+A robust, lightweight core utility package for Flutter applications[cite: 1]. It provides a unified database abstraction layer (with built-in Supabase support), offline caching with Hive, automatic internet connectivity monitoring, and device identification helpers[cite: 1].
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+* **Unified Database Client:** Abstract database interface with an out-of-the-box `SupabaseService` implementation covering Auth and CRUD operations with query filters[cite: 1].
+* **Offline Caching & Sync (`DataResource` & `HiveHelper`):** Seamless local caching, cache-first resource handling, and incremental sync management using Hive[cite: 1].
+* **Real-time Internet Checker:** Device-level connection checking that distinguishes between active internet access, local network (no internet), and completely disconnected states[cite: 1].
+* **Device Service:** Easy cross-platform unique device identifier extraction (Android, iOS, Linux, Web)[cite: 1].
+* **Environment Configuration:** Helper for retrieving environment variables safely across platforms[cite: 1].
 
-## Getting started
+## Getting Started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add `skepr_core` to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  skepr_core: ^0.0.0
+
+```
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+### 1. Initialize Hive & Database Client
 
 ```dart
-const like = 'sample';
+import "package:skepr_core/skepr_core.dart";
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive boxes
+  await HiveHelper.init(boxes: ["users", "settings"]);
+
+  // Initialize Supabase client
+  final db = SupabaseService();
+  await db.init(
+    url: "YOUR_SUPABASE_URL",
+    anonKey: "YOUR_SUPABASE_ANON_KEY",
+  );
+
+  runApp(const MyApp());
+}
+
 ```
 
-## Additional information
+### 2. Internet Connectivity Listener
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+```dart
+import "package:flutter/material.dart";
+import "package:skepr_core/skepr_core.dart";
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: const Text("Home").listenToInternet(
+        onChange: (context, status) {
+          if (status == ConnectionStateStatus.disconnected) {
+            // Handle offline state
+          }
+        },
+      ),
+    );
+  }
+}
+
+```
+
+## License
+
+MIT License
+

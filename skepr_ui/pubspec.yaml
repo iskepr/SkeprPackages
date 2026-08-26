@@ -1,5 +1,5 @@
 name: skepr_ui
-description: "A new Flutter package project."
+description: "A modern Flutter UI toolkit featuring customizable inputs, sections with search/sort/filter, Markdown rendering, bottom sheets, and responsive widgets."
 version: 0.0.1
 homepage: https://github.com/iskepr/SkeprPackages/tree/master/skepr_ui
 

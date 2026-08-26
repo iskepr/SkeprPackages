@@ -1,5 +1,5 @@
 name: skepr_core
-description: "A new Flutter package project."
+description: "A lightweight core utility package for Flutter providing unified database clients, offline caching via Hive, internet monitoring, and device helpers."
 version: 0.0.1
 homepage: https://github.com/iskepr/SkeprPackages/tree/master/skepr_core
 

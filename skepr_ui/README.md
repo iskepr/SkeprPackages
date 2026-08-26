@@ -1,39 +1,84 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Skepr UI
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+A modern and highly customizable Flutter UI toolkit[cite: 1]. Designed with built-in localization (Arabic/English), glassmorphism styles, structured section widgets with filtering/sorting/search, interactive inputs, and bidirectional Markdown support[cite: 1].
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+* **Smart Sections (`Section<T>`):** Pre-built lists and containers featuring built-in search bar, dynamic sorting, and multi-condition filter chips[cite: 1].
+* **Comprehensive Inputs:** Modern text fields, searchable/expandable select pickers (`SelectInput`, `MulteSelect`), segmented radio bars, and number inputs[cite: 1].
+* **Bi-directional Markdown (`SkeprMarkdown`):** GitHub-styled markdown viewer with automatic text direction detection (RTL/LTR) per line[cite: 1].
+* **Material & Theming Helpers:** `MyMaterial` wrapper supporting glassmorphism and solid styles, custom dialogs, bottom sheets, and haptic feedback utilities[cite: 1].
+* **Navigation UI:** Customizable bottom navigation bar and page wrappers with sticky headers[cite: 1].
 
-## Getting started
+## Getting Started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add `skepr_ui` to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  skepr_ui: ^0.0.0
+
+```
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+### 1. Setup SkeprMaterial
 
 ```dart
-const like = 'sample';
+import "package:flutter/material.dart";
+import "package:skepr_ui/skepr_ui.dart";
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      scaffoldMessengerKey: SkeprMaterial.messengerKey,
+      localizationsDelegates: SkeprLocalizations.localizationsDelegates,
+      supportedLocales: SkeprLocalizations.supportedLocales,
+      home: const MainScreen(),
+    );
+  }
+}
+
 ```
 
-## Additional information
+### 2. Structured Section Example
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+```dart
+Section<User>(
+  title: "المستخدمين",
+  listData: usersList,
+  searchMatcher: (user) => user.name,
+  itemBuilder: (context, user, index) => CustomListTile(
+    title: user.name,
+    subtitle: user.email,
+  ),
+);
+
+```
+
+### 3. Bi-directional Markdown Viewer
+
+```dart
+SkeprMarkdown(
+  content: """
+# عنوان المقال
+هذا النص باللغة العربية وسيتم ضبط اتجاهه تلقائياً.
+
+- Point 1 in English
+- Point 2
+  """,
+);
+
+```
+
+## License
+
+MIT License
+
