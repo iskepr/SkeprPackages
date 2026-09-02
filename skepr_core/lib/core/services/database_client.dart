@@ -1,4 +1,6 @@
 import "package:flutter/material.dart";
+import "package:skepr_core/local.dart";
+import "package:skepr_core/skepr_core.dart";
 
 abstract class DatabaseClient {
   dynamic get currentSession;
@@ -73,25 +75,20 @@ abstract class DatabaseClient {
       return;
     }
 
-    // TODO: fix show Dialog
-    // return showCustomDialog(
-    //   title: title,
-    //   subtitle: l10n.areYouSure,
-    //   onConfirm: () async {
-    //     try {
-    //       await executeDelete(
-    //         tableName,
-    //         filters: filters,
-    //         isRealDelete: isRealDelete,
-    //       );
-    //       showMessage("تم $title بنجاح", isError: false);
-    //       if (onSuccess != null) onSuccess();
-    //     } catch (e, t) {
-    //       showError("$e - $t", "delete_${tableName}_row", userMessage: "الحذف");
-    //     }
-    //     if (context.mounted && pop) context.close();
-    //   },
-    // );
+    return SkeprCore.showCustomDialog?.call(
+      title: title,
+      subtitle: "هل انت متأكد؟",
+      onConfirm: () async {
+        await executeDelete(
+          tableName,
+          filters: filters,
+          isRealDelete: isRealDelete,
+        );
+        showMessage("تم $title بنجاح", isError: false);
+        if (onSuccess != null) onSuccess();
+        if (context.mounted && pop) Navigator.pop(context);
+      },
+    );
   }
 
   @protected
@@ -114,6 +111,7 @@ enum FilterOperator {
   not,
   iss,
   ilike,
+  or
 }
 
 class QueryFilter {

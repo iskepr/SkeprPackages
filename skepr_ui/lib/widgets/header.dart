@@ -1,27 +1,32 @@
 import "package:flutter/material.dart";
 import "package:skepr_ui/skepr_ui.dart";
 
-class Header extends StatefulWidget {
+class Header extends StatelessWidget {
   const Header({
     super.key,
-    required this.start,
-    required this.end,
+    this.start,
+    required this.title,
     this.center,
+    this.withBackButton,
+    this.end,
     this.bg,
-  });
-  final Widget start;
+  }) : assert(
+         title is String || title is Widget,
+         "title must be a String or a Widget",
+       );
+
+  final List<Widget>? start;
+  final dynamic title;
   final Widget? center;
-  final List<Widget> end;
+  final List<Widget>? end;
+  final bool? withBackButton;
   final Color? bg;
   @override
-  State<Header> createState() => _HeaderState();
-}
-
-class _HeaderState extends State<Header> {
-  @override
   Widget build(BuildContext context) {
+    final bool canPop = withBackButton ?? Navigator.of(context).canPop();
+
     final double statusBarHeight = MediaQuery.of(context).padding.top;
-    final bg = widget.bg ?? context.background;
+    final bg = this.bg ?? context.background;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -39,13 +44,32 @@ class _HeaderState extends State<Header> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            widget.start,
-            if (widget.center != null)
+            if (start != null) MyMaterial(child: Row(children: start!)),
+
+            if (title is String)
+              Text(title, style: const TextStyle(fontSize: kLargeFont))
+            else
+              title,
+
+            if (center != null)
               MyMaterial(
                 padding: const EdgeInsets.all(kMediumPadding * 0.8),
-                child: widget.center!,
+                child: center!,
               ),
-            MyMaterial(child: Row(children: widget.end)),
+
+            if (end != null || canPop)
+              MyMaterial(
+                child: Row(
+                  children: [
+                    ...end ?? [],
+                    if (canPop)
+                      IconButton(
+                        icon: const Icon(LucideIcons.chevronRight),
+                        onPressed: () => context.close(),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

@@ -251,16 +251,21 @@ class SupabaseService extends DatabaseClient {
     required List<QueryFilter> filters,
     required bool isRealDelete,
   }) async {
-    var query = isRealDelete
-        ? _supabase.from(tableName).delete()
-        : _supabase.from(tableName).update({
-            kFisDeleted: true,
-            kFupdatedAt: DateTime.now().toIso8601String(),
-          });
+    try {
+      var query = isRealDelete
+          ? _supabase.from(tableName).delete()
+          : _supabase.from(tableName).update({
+              kFisDeleted: true,
+              kFupdatedAt: DateTime.now().toIso8601String(),
+            });
 
-    query = _applyFilters(query, filters);
+      query = _applyFilters(query, filters);
 
-    await query;
+      await query;
+    } catch (e, t) {
+      showError("$e - $t", "upsert_$tableName", userMessage: "الحذف");
+      throw e;
+    }
   }
 
   PostgrestFilterBuilder _applyFilters(
@@ -281,6 +286,8 @@ class SupabaseService extends DatabaseClient {
           dynamicQuery = dynamicQuery.filter(filter.field, "is", filter.value);
         case FilterOperator.ilike:
           dynamicQuery = dynamicQuery.ilike(filter.field, "%${filter.value}%");
+        case FilterOperator.or:
+          dynamicQuery = dynamicQuery.or(filter.value);
         case FilterOperator.notNull:
           dynamicQuery = dynamicQuery.not(filter.field, "is", null);
         case FilterOperator.notEq:

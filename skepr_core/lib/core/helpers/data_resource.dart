@@ -3,7 +3,7 @@ import "package:skepr_core/local.dart";
 import "package:skepr_core/skepr_core.dart";
 
 const String kFisDeleted = "is_deleted";
-const String kFupdatedAt = "is_updated";
+const String kFupdatedAt = "updated_at";
 const String kFid = "id";
 
 class DataResource<T> {
@@ -22,10 +22,14 @@ class DataResource<T> {
   }) async {
     try {
       List<T> cachedData = [];
-      if (subKey != null) {
-        cachedData = HiveHelper.getListDataByKey<T>(cacheKey, subKey);
-      } else {
-        cachedData = HiveHelper.getListData<T>(cacheKey);
+      try {
+        if (subKey != null) {
+          cachedData = HiveHelper.getListDataByKey<T>(cacheKey, subKey);
+        } else {
+          cachedData = HiveHelper.getListData<T>(cacheKey);
+        }
+      } catch (e) {
+        cachedData = [];
       }
 
       final List<T> currentData = List.from(cachedData);
@@ -69,6 +73,8 @@ class DataResource<T> {
         response = await fetcher(null);
       }
 
+      final List rawList = (response is List) ? response : [];
+
       List<T> data;
 
       if (getId != null && currentData.isNotEmpty && !isForceRefresh) {
@@ -76,23 +82,24 @@ class DataResource<T> {
           for (var item in currentData) getId(item): item,
         };
 
-        for (var row in response) {
-          final isDeleted = row[kFisDeleted] ?? false;
+        for (var raw in rawList) {
+          final row = Map<String, dynamic>.from(raw as Map);
+          final isDeleted = row[kFisDeleted] == true;
           final newId = row[remoteIdKey];
 
           if (isDeleted) {
             dataMap.remove(newId);
           } else {
-            final newItem = mapper(row as Map<String, dynamic>);
+            final newItem = mapper(row);
             dataMap[newId] = newItem;
           }
         }
 
         data = dataMap.values.toList();
       } else {
-        data = response
-            .where((row) => !(row[kFisDeleted] ?? false))
-            .map<T>((e) => mapper(e as Map<String, dynamic>))
+        data = rawList
+            .where((raw) => (raw as Map)[kFisDeleted] != true)
+            .map<T>((raw) => mapper(Map<String, dynamic>.from(raw as Map)))
             .toList();
       }
 
@@ -100,12 +107,16 @@ class DataResource<T> {
         data = processor(data);
       }
 
-      if (subKey != null) {
-        await HiveHelper.saveListDataByKey(cacheKey, subKey, data);
-      } else {
-        final box = HiveHelper.getBox(cacheKey);
-        await box.clear();
-        await box.addAll(data);
+      try {
+        if (subKey != null) {
+          await HiveHelper.saveListDataByKey(cacheKey, subKey, data);
+        } else {
+          final box = HiveHelper.getBox(cacheKey);
+          await box.clear();
+          await box.addAll(data);
+        }
+      } catch (e) {
+        debugPrint("Hive Save Warning: $e");
       }
 
       onSuccess(data);
