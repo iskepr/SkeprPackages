@@ -6,6 +6,11 @@ const String kFisDeleted = "is_deleted";
 const String kFupdatedAt = "updated_at";
 const String kFid = "id";
 
+// مفاتيح التخزين داخل نفس البوكس
+const String kCacheMetaDependency = "__dep__";
+const String kCacheMetaLastFetch = "__time__";
+const String kCacheDefaultDataKey = "__data__";
+
 class DataResource<T> {
   static Future<void> handle<T>({
     required String cacheKey,
@@ -13,21 +18,54 @@ class DataResource<T> {
     required Future<dynamic> Function(String? lastSyncTime) fetcher,
     required T Function(Map<String, dynamic> map) mapper,
     dynamic Function(T item)? getId,
-    String remoteIdKey = "id",
+    String remoteIdKey = kFid,
     List<T> Function(List<T> data)? processor,
     required Function(List<T> data) onLoading,
     required Function(List<T> data) onSuccess,
     required Function(String error) onError,
     bool isForceRefresh = false,
+    String? dependencyKey,
+    Duration? validDuration,
   }) async {
     try {
+      final effectiveDataKey = subKey ?? kCacheDefaultDataKey;
+      bool needsFullRefresh = isForceRefresh;
+
+      // 1. التحقق من مفتاح التبعية
+      if (dependencyKey != null) {
+        try {
+          final oldDepKey = HiveHelper.getData<String>(
+            cacheKey,
+            key: kCacheMetaDependency,
+          );
+          if (oldDepKey != dependencyKey) {
+            needsFullRefresh = true;
+          }
+        } catch (_) {}
+      }
+
+      // 2. التحقق من صلاحية الكاش (TTL)
+      if (validDuration != null && !needsFullRefresh) {
+        try {
+          final lastFetchStr = HiveHelper.getData<String>(
+            cacheKey,
+            key: kCacheMetaLastFetch,
+          );
+          if (lastFetchStr != null) {
+            final lastFetch = DateTime.parse(lastFetchStr);
+            if (DateTime.now().difference(lastFetch) > validDuration) {
+              needsFullRefresh = true;
+            }
+          } else {
+            needsFullRefresh = true;
+          }
+        } catch (_) {}
+      }
+
+      // 3. جلب الداتا المتكاشة بمفتاح محدد لتجنب التضارب
       List<T> cachedData = [];
       try {
-        if (subKey != null) {
-          cachedData = HiveHelper.getListDataByKey<T>(cacheKey, subKey);
-        } else {
-          cachedData = HiveHelper.getListData<T>(cacheKey);
-        }
+        cachedData = HiveHelper.getListDataByKey<T>(cacheKey, effectiveDataKey);
       } catch (e) {
         cachedData = [];
       }
@@ -35,7 +73,8 @@ class DataResource<T> {
       final List<T> currentData = List.from(cachedData);
       String? lastSyncTime;
 
-      if (currentData.isNotEmpty && !isForceRefresh) {
+      // لو محتاجين تحديث كامل، بنسيب lastSyncTime بقيمة null
+      if (currentData.isNotEmpty && !needsFullRefresh) {
         try {
           final timestamps = currentData
               .map((e) {
@@ -60,7 +99,8 @@ class DataResource<T> {
         } catch (e) {
           debugPrint("Sync Error: $e");
         }
-
+        onLoading(currentData);
+      } else if (needsFullRefresh) {
         onLoading(currentData);
       }
 
@@ -72,12 +112,13 @@ class DataResource<T> {
       } catch (e) {
         response = await fetcher(null);
       }
+      print(response);
 
       final List rawList = (response is List) ? response : [];
-
       List<T> data;
 
-      if (getId != null && currentData.isNotEmpty && !isForceRefresh) {
+      // دمج التعديلات لو مش تحديث كامل
+      if (getId != null && currentData.isNotEmpty && !needsFullRefresh) {
         final Map<dynamic, T> dataMap = {
           for (var item in currentData) getId(item): item,
         };
@@ -90,11 +131,9 @@ class DataResource<T> {
           if (isDeleted) {
             dataMap.remove(newId);
           } else {
-            final newItem = mapper(row);
-            dataMap[newId] = newItem;
+            dataMap[newId] = mapper(row);
           }
         }
-
         data = dataMap.values.toList();
       } else {
         data = rawList
@@ -107,14 +146,23 @@ class DataResource<T> {
         data = processor(data);
       }
 
+      // 4. حفظ البيانات والميتاداتا داخل نفس البوكس بمفاتيح منفصلة
       try {
-        if (subKey != null) {
-          await HiveHelper.saveListDataByKey(cacheKey, subKey, data);
-        } else {
-          final box = HiveHelper.getBox(cacheKey);
-          await box.clear();
-          await box.addAll(data);
+        await HiveHelper.saveListDataByKey<T>(cacheKey, effectiveDataKey, data);
+
+        if (dependencyKey != null) {
+          await HiveHelper.saveData<String>(
+            cacheKey,
+            dependencyKey,
+            key: kCacheMetaDependency,
+          );
         }
+
+        await HiveHelper.saveData<String>(
+          cacheKey,
+          DateTime.now().toIso8601String(),
+          key: kCacheMetaLastFetch,
+        );
       } catch (e) {
         debugPrint("Hive Save Warning: $e");
       }
