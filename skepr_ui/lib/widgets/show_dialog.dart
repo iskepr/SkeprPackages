@@ -1,10 +1,12 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 import "package:skepr_ui/skepr_ui.dart";
 
 void showCustomDialog({
   required String title,
   String? subtitle,
-  void Function()? onConfirm,
+  FutureOr<void> Function()? onConfirm,
   void Function()? onDismiss,
   bool closeOnConfirm = true,
   Widget? child,
@@ -60,7 +62,7 @@ class CustomDialog extends StatelessWidget {
 
   final String title;
   final String? subtitle;
-  final void Function()? onConfirm;
+  final FutureOr<void> Function()? onConfirm;
   final bool closeOnConfirm;
   final Widget? child;
 
@@ -117,9 +119,9 @@ class CustomDialog extends StatelessWidget {
                   DialogButton(
                     title: l10n.confirm,
                     color: context.primary,
-                    onPressed: () {
-                      onConfirm?.call();
-                      if (closeOnConfirm) context.close();
+                    onPressed: () async {
+                      await onConfirm?.call();
+                      if (closeOnConfirm && context.mounted) context.close();
                     },
                   ),
                 ],

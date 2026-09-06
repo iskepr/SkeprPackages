@@ -1,5 +1,5 @@
 import "package:flutter/material.dart";
-import "package:intl/intl.dart";
+import "package:intl/intl.dart" hide TextDirection;
 
 export "date_time.dart";
 export "string_extensions.dart";
@@ -7,13 +7,20 @@ export "string_extensions.dart";
 extension StringExtension on String {
   String get removeEl => replaceFirst("ال", "");
 
-  String get addEl {
-    if ("" == "ar") {
+  String addEl(String lang) {
+    if (lang == "ar") {
       return "ال$this";
     } else {
       return this;
     }
   }
+}
+
+extension DirectionalityExtension on BuildContext {
+  TextDirection get reverseDirection =>
+      Directionality.of(this) == TextDirection.rtl
+      ? TextDirection.ltr
+      : TextDirection.rtl;
 }
 
 extension TimeExtension on String {

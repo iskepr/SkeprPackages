@@ -25,8 +25,7 @@ class MyMaterial extends StatelessWidget {
   });
 
   final Widget child;
-  final EdgeInsets? padding;
-  final EdgeInsets? margin;
+  final EdgeInsetsGeometry? padding, margin;
   final BorderRadius borderRadius;
   final double blurStrength;
   final double? height;
@@ -120,8 +119,8 @@ class MyMaterial extends StatelessWidget {
     return Border(
       top: side,
       bottom: side,
-      left: isTall ? side.copyWith(width: 0.3) : BorderSide.none,
-      right: isTall ? side.copyWith(width: 0.3) : BorderSide.none,
+      // left: isTall ? side.copyWith(width: 0.3) : BorderSide.none,
+      // right: isTall ? side.copyWith(width: 0.3) : BorderSide.none,
     );
   }
 }

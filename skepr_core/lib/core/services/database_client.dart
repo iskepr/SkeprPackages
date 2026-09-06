@@ -20,6 +20,7 @@ abstract class DatabaseClient {
     required String newPassword,
   });
   Future<void> signOut();
+  Future<Map<String, dynamic>> function(String name, Map<String, dynamic> body);
 
   Future<dynamic> insert<T>(
     String tableName, {
@@ -111,7 +112,7 @@ enum FilterOperator {
   not,
   iss,
   ilike,
-  or
+  or,
 }
 
 class QueryFilter {

@@ -71,34 +71,15 @@ class DataResource<T> {
       }
 
       final List<T> currentData = List.from(cachedData);
-      String? lastSyncTime;
 
-      // لو محتاجين تحديث كامل، بنسيب lastSyncTime بقيمة null
+      String? lastSyncTime;
       if (currentData.isNotEmpty && !needsFullRefresh) {
         try {
-          final timestamps = currentData
-              .map((e) {
-                try {
-                  final upTime = (e as dynamic).updatedAt;
-                  if (upTime != null) return upTime.toString();
-                } catch (_) {}
-                try {
-                  final crTime = (e as dynamic).createdAt;
-                  if (crTime != null) return crTime.toString();
-                } catch (_) {}
-                return null;
-              })
-              .where((e) => e != null && e.isNotEmpty)
-              .cast<String>()
-              .toList();
-
-          if (timestamps.isNotEmpty) {
-            timestamps.sort((a, b) => b.compareTo(a));
-            lastSyncTime = timestamps.first;
-          }
-        } catch (e) {
-          debugPrint("Sync Error: $e");
-        }
+          lastSyncTime = HiveHelper.getData<String>(
+            cacheKey,
+            key: kCacheMetaLastFetch,
+          );
+        } catch (_) {}
         onLoading(currentData);
       } else if (needsFullRefresh) {
         onLoading(currentData);
@@ -115,6 +96,10 @@ class DataResource<T> {
       print(response);
 
       final List rawList = (response is List) ? response : [];
+      if (rawList.isEmpty && currentData.isNotEmpty && !needsFullRefresh) {
+        onSuccess(currentData);
+        return;
+      }
       List<T> data;
 
       // دمج التعديلات لو مش تحديث كامل

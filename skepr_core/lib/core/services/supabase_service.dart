@@ -62,6 +62,23 @@ class SupabaseService extends DatabaseClient {
   Future<void> signOut() => _supabase.auth.signOut();
 
   @override
+  Future<Map<String, dynamic>> function(
+    String name,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final response = await _supabase.functions.invoke(name, body: body);
+      return {"status": response.status, "data": response.data};
+    } on FunctionException catch (e, t) {
+      showError("$e - $t", "function_$name");
+      return {"status": e.status, "data": e.details};
+    } catch (e, t) {
+      showError("$e - $t", "function_$name");
+      return {"status": 500};
+    }
+  }
+
+  @override
   Future<dynamic> insert<T>(
     String tableName, {
     required dynamic data,
@@ -188,6 +205,7 @@ class SupabaseService extends DatabaseClient {
       if (select != null) query = query.select(select);
       final response = await query;
 
+      // TODO: لا يتم عرض الرسالة
       if (userMessage != null) showMessage(userMessage, isError: false);
       if (onSuccess != null) onSuccess();
       return response;

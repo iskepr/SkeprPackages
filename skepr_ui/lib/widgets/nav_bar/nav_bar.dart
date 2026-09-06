@@ -23,7 +23,7 @@ class NavBar extends StatelessWidget {
     final leftItems = hasRightAction ? items.sublist(1) : items;
 
     void handleTap(NavBarEntity entity, int index) {
-      if (entity.isWidget) {
+      if (entity.widget != null) {
         onPageChanged(index);
         SkeprMaterial.onScreenTracked?.call(
           entity.widget.runtimeType.toString(),

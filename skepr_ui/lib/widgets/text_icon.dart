@@ -15,6 +15,7 @@ class TextIcon extends StatefulWidget {
     this.hideText = false,
     this.disabled = false,
     this.onPressed,
+    this.withBG,
   });
 
   final String title;
@@ -23,8 +24,8 @@ class TextIcon extends StatefulWidget {
   final String? fontFamily;
   final Color? color;
   final String? tooltipTitle;
-  final bool hideText;
-  final bool disabled;
+  final bool hideText, disabled;
+  final bool? withBG;
   final void Function()? onPressed;
 
   @override
@@ -73,7 +74,7 @@ class _TextIconState extends State<TextIcon> {
   Widget build(BuildContext context) {
     final bool showText = !widget.hideText || _isOpened;
 
-    final Widget child = Row(
+    Widget child = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedScale(
@@ -114,6 +115,20 @@ class _TextIconState extends State<TextIcon> {
         ),
       ],
     );
+
+    if (widget.withBG == true) {
+      child = Container(
+        padding: EdgeInsets.symmetric(
+          vertical: kSmallPadding * (widget.size / 20),
+          horizontal: kLargePadding * (widget.size / 15),
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(kCircleBorderRadius),
+          color: widget.color?.withOpacity(0.2),
+        ),
+        child: child,
+      );
+    }
 
     if (!widget.disabled && (widget.hideText || widget.onPressed != null)) {
       return GestureDetector(
