@@ -91,9 +91,9 @@ class DataResource<T> {
       try {
         response = await fetcher(lastSyncTime);
       } catch (e) {
-        response = await fetcher(null);
+        debugPrint("Fetcher with lastSync failed: $e");
       }
-      print(response);
+      debugPrint(response.toString());
 
       final List rawList = (response is List) ? response : [];
       if (rawList.isEmpty && currentData.isNotEmpty && !needsFullRefresh) {
@@ -145,7 +145,7 @@ class DataResource<T> {
 
         await HiveHelper.saveData<String>(
           cacheKey,
-          DateTime.now().toIso8601String(),
+          DateTime.now().toUtc().toIso8601String(),
           key: kCacheMetaLastFetch,
         );
       } catch (e) {

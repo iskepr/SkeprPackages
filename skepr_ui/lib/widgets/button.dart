@@ -33,9 +33,12 @@ class Button extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return theme == MyButtonTheme.colorful
-        ? buildButton(context)
-        : MyMaterial(child: buildButton(context));
+    return Tooltip(
+      message: disable ? tooltipTitle : "",
+      child: theme == MyButtonTheme.colorful
+          ? buildButton(context)
+          : MyMaterial(child: buildButton(context)),
+    );
   }
 
   Widget buildButton(BuildContext context) {
@@ -82,7 +85,6 @@ class Button extends StatelessWidget {
         title,
         icon: icon!,
         size: size ?? kMediumFont,
-        tooltipTitle: tooltipTitle,
         disabled: true,
       );
     }

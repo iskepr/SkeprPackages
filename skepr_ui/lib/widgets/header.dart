@@ -47,7 +47,13 @@ class Header extends StatelessWidget {
             if (start != null) MyMaterial(child: Row(children: start!)),
 
             if (title is String)
-              Text(title, style: const TextStyle(fontSize: kLargeFont))
+              Expanded(
+                flex: center != null ? 0 : 1,
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: kLargeFont),
+                ),
+              )
             else
               title,
 

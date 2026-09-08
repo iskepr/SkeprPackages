@@ -119,13 +119,20 @@ class SupabaseService extends DatabaseClient {
           return resultData;
         }
       }
+    } on PostgrestException catch (e, t) {
+      showError(
+        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint}",
+        "insert_$tableName",
+        userMessage: userMessage ?? "الإضافة",
+      );
+      rethrow;
     } catch (e, t) {
       showError(
         "$e - $t",
         "insert_$tableName",
         userMessage: userMessage ?? "الإضافة",
       );
-      return single ? null : <T>[];
+      rethrow;
     }
   }
 

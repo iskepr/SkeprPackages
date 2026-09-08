@@ -70,7 +70,7 @@ extension FormateTimeDuration on Duration {
 }
 
 class DateTimeHelper {
-  static DateTime get now => DateTime.now();
+  static DateTime get now => DateTime.now().toUtc();
 
   static String get nowIso => now.toIso8601String();
 
