@@ -34,6 +34,7 @@ class SupabaseService extends DatabaseClient {
         email: email.trim().toLowerCase(),
         password: password.trim(),
       );
+
   @override
   Future<void> resetPasswordForEmail(String email) =>
       _supabase.auth.resetPasswordForEmail(email);
@@ -157,18 +158,12 @@ class SupabaseService extends DatabaseClient {
 
       if (options.orFilters.isNotEmpty) {
         final orString = options.orFilters
-            .map((f) {
-              String op;
-              switch (f.operator) {
-                case FilterOperator.iss:
-                  op = "is";
-                default:
-                  op = f.operator.name;
-              }
-              return "${f.field}.$op.${f.value}";
-            })
+            .map((f) => f.toPostgrest())
+            .where((s) => s.isNotEmpty)
             .join(",");
-        query = query.or(orString);
+        if (orString.isNotEmpty) {
+          query = query.or(orString);
+        }
       }
 
       if (options.orderBy != null && options.orderBy!.isNotEmpty) {
@@ -212,7 +207,6 @@ class SupabaseService extends DatabaseClient {
       if (select != null) query = query.select(select);
       final response = await query;
 
-      // TODO: لا يتم عرض الرسالة
       if (userMessage != null) showMessage(userMessage, isError: false);
       if (onSuccess != null) onSuccess();
       return response;
@@ -305,6 +299,12 @@ class SupabaseService extends DatabaseClient {
           dynamicQuery = dynamicQuery.eq(filter.field, filter.value);
         case FilterOperator.gt:
           dynamicQuery = dynamicQuery.gt(filter.field, filter.value);
+        case FilterOperator.gte:
+          dynamicQuery = dynamicQuery.gte(filter.field, filter.value);
+        case FilterOperator.lt:
+          dynamicQuery = dynamicQuery.lt(filter.field, filter.value);
+        case FilterOperator.lte:
+          dynamicQuery = dynamicQuery.lte(filter.field, filter.value);
         case FilterOperator.inList:
           dynamicQuery = dynamicQuery.filter(filter.field, "in", filter.value);
         case FilterOperator.iss:
@@ -312,7 +312,15 @@ class SupabaseService extends DatabaseClient {
         case FilterOperator.ilike:
           dynamicQuery = dynamicQuery.ilike(filter.field, "%${filter.value}%");
         case FilterOperator.or:
-          dynamicQuery = dynamicQuery.or(filter.value);
+          final expr = filter.subFilters != null
+              ? filter.subFilters!.map((f) => f.toPostgrest()).join(",")
+              : filter.value.toString();
+          dynamicQuery = dynamicQuery.or(expr);
+        case FilterOperator.and:
+          final expr = filter.subFilters != null
+              ? filter.subFilters!.map((f) => f.toPostgrest()).join(",")
+              : filter.value.toString();
+          dynamicQuery = dynamicQuery.or("and($expr)");
         case FilterOperator.notNull:
           dynamicQuery = dynamicQuery.not(filter.field, "is", null);
         case FilterOperator.notEq:
@@ -335,9 +343,13 @@ class SupabaseService extends DatabaseClient {
               supabaseOp,
               filter.value,
             );
+          } else {
+            dynamicQuery = dynamicQuery.not(
+              filter.field,
+              filter.value == null ? "is" : "eq",
+              filter.value,
+            );
           }
-        default:
-          break;
       }
     }
 

@@ -113,6 +113,7 @@ enum FilterOperator {
   iss,
   ilike,
   or,
+  and,
 }
 
 class QueryFilter {
@@ -120,13 +121,73 @@ class QueryFilter {
   final FilterOperator operator;
   final dynamic value;
   final FilterOperator? subOperator;
+  final List<QueryFilter>? subFilters;
 
   const QueryFilter({
-    required this.field,
+    this.field = "",
     required this.operator,
     this.value,
     this.subOperator,
+    this.subFilters,
   });
+
+  String toPostgrest() {
+    switch (operator) {
+      case FilterOperator.and:
+        if (subFilters == null || subFilters!.isEmpty) return "";
+        final inner = subFilters!
+            .map((f) => f.toPostgrest())
+            .where((s) => s.isNotEmpty)
+            .join(",");
+        return "and($inner)";
+
+      case FilterOperator.or:
+        if (subFilters != null && subFilters!.isNotEmpty) {
+          final inner = subFilters!
+              .map((f) => f.toPostgrest())
+              .where((s) => s.isNotEmpty)
+              .join(",");
+          return "or($inner)";
+        }
+        return value?.toString() ?? "";
+
+      case FilterOperator.iss:
+        return "$field.is.$value";
+
+      case FilterOperator.inList:
+        final formatted = value is Iterable
+            ? "(${(value as Iterable).join(',')})"
+            : "($value)";
+        return "$field.in.$formatted";
+
+      case FilterOperator.notNull:
+        return "$field.not.is.null";
+
+      case FilterOperator.notEq:
+        return "$field.neq.$value";
+
+      case FilterOperator.not:
+        if (subOperator != null) {
+          final op = subOperator == FilterOperator.iss
+              ? "is"
+              : (subOperator == FilterOperator.inList
+                    ? "in"
+                    : subOperator!.name);
+          final formatted =
+              (subOperator == FilterOperator.inList && value is Iterable)
+              ? "(${(value as Iterable).join(',')})"
+              : "$value";
+          return "$field.not.$op.$formatted";
+        }
+        return "$field.not.${value == null ? 'is.null' : 'eq.$value'}";
+
+      case FilterOperator.ilike:
+        return "$field.ilike.*$value*";
+
+      default:
+        return "$field.${operator.name}.$value";
+    }
+  }
 }
 
 class QueryOptions {
