@@ -21,12 +21,59 @@ class Header extends StatelessWidget {
   final List<Widget>? end;
   final bool? withBackButton;
   final Color? bg;
+
   @override
   Widget build(BuildContext context) {
     final bool canPop = withBackButton ?? Navigator.of(context).canPop();
-
     final double statusBarHeight = MediaQuery.of(context).padding.top;
     final bg = this.bg ?? context.background;
+
+    final leftSide = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (start != null) MyMaterial(child: Row(children: start!)),
+        if (title != null) ...[
+          if (start != null) const SizedBox(width: kSmallPadding),
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: title is String
+                    ? Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: kLargeFont),
+                      )
+                    : title,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final rightSide = (end != null || canPop)
+        ? Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: MyMaterial(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...end ?? [],
+                  if (canPop)
+                    IconButton(
+                      icon: const Icon(LucideIcons.chevronRight),
+                      onPressed: () => context.close(),
+                    ),
+                ],
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -42,40 +89,13 @@ class Header extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          spacing: kSmallPadding,
           children: [
-            if (start != null) MyMaterial(child: Row(children: start!)),
+            Expanded(child: leftSide),
 
-            if (title is String)
-              Expanded(
-                flex: center != null ? 0 : 1,
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: kLargeFont),
-                ),
-              )
-            else
-              title,
+            if (center != null) center!,
 
-            if (center != null)
-              MyMaterial(
-                padding: const EdgeInsets.all(kMediumPadding * 0.8),
-                child: center!,
-              ),
-
-            if (end != null || canPop)
-              MyMaterial(
-                child: Row(
-                  children: [
-                    ...end ?? [],
-                    if (canPop)
-                      IconButton(
-                        icon: const Icon(LucideIcons.chevronRight),
-                        onPressed: () => context.close(),
-                      ),
-                  ],
-                ),
-              ),
+            Expanded(child: rightSide),
           ],
         ),
       ),
