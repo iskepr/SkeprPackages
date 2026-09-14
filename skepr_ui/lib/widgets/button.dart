@@ -33,12 +33,15 @@ class Button extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: disable ? tooltipTitle : "",
-      child: theme == MyButtonTheme.colorful
-          ? buildButton(context)
-          : MyMaterial(child: buildButton(context)),
-    );
+    final Widget button = theme == MyButtonTheme.colorful
+        ? buildButton(context)
+        : MyMaterial(child: buildButton(context));
+
+    if (disable && tooltipTitle != null && tooltipTitle!.isNotEmpty) {
+      return Tooltip(message: tooltipTitle!, child: button);
+    }
+
+    return button;
   }
 
   Widget buildButton(BuildContext context) {
