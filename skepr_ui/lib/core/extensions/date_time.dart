@@ -51,6 +51,23 @@ extension DateTimeFormat on DateTime {
     }
     return fullDateTime;
   }
+
+  String get timeAgo {
+    if (this == null) return "";
+    final date = this!;
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) {
+      if (diff.inHours == 0) {
+        return diff.inMinutes <= 1 ? "الآن" : "منذ ${diff.inMinutes} دقيقة";
+      }
+      return "منذ ${diff.inHours} ساعة";
+    } else if (diff.inDays < 7) {
+      return "منذ ${diff.inDays} يوم";
+    }
+    return "${date.year}/${date.month}/${date.day}";
+  }
 }
 
 extension FormateTimeDuration on Duration {
