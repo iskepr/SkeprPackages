@@ -37,8 +37,9 @@ class Button extends StatelessWidget {
         ? buildButton(context)
         : MyMaterial(child: buildButton(context));
 
-    if (disable && tooltipTitle != null && tooltipTitle!.isNotEmpty) {
-      return Tooltip(message: tooltipTitle!, child: button);
+    final text = tooltipTitle?.trim();
+    if (disable && text != null && text.isNotEmpty) {
+      return Tooltip(message: text, child: button);
     }
 
     return button;

@@ -31,7 +31,10 @@ void showMessage(
     });
 
     if (isBottomSheetOpen && !PlatformUtils.isDesktop) {
-      ToastHelper.showToastt(msg, bgColor);
+      final ToastType type = isError == true
+          ? ToastType.error
+          : ToastType.success;
+      ToastHelper.showToastt(message: msg, bgColor: bgColor, type: type);
     } else {
       SkeprMaterial.messengerKey.currentState?.clearSnackBars();
       SkeprMaterial.messengerKey.currentState?.showSnackBar(
@@ -64,8 +67,16 @@ void showMessage(
 }
 
 class ToastHelper {
-  static void showToastt(String message, Color bgColor) =>
-      showToast(type: ToastType.success, message: message);
+  static void showToastt({
+    required String message,
+    required Color bgColor,
+    required ToastType type,
+    required,
+  }) => showToast(
+    type: type,
+    message: message,
+    options: NativeToastOptions(bgColor: bgColor),
+  );
 }
 
 void hideMessage() => SkeprMaterial.messengerKey.currentState?.clearSnackBars();
