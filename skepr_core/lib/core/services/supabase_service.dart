@@ -122,7 +122,7 @@ class SupabaseService extends DatabaseClient {
       }
     } on PostgrestException catch (e, t) {
       showError(
-        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint}",
+        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint} | Track: $t",
         "insert_$tableName",
         userMessage: userMessage ?? "الإضافة",
       );
@@ -256,7 +256,7 @@ class SupabaseService extends DatabaseClient {
       }
     } on PostgrestException catch (e, t) {
       showError(
-        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint}",
+        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint} | Track: $t",
         "insert_$tableName",
         userMessage: userMessage ?? "الإضافة",
       );

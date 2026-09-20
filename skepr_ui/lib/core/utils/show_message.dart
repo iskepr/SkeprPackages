@@ -73,8 +73,8 @@ class ToastHelper {
     required ToastType type,
     required,
   }) => showToast(
+    title: message,
     type: type,
-    message: message,
     options: NativeToastOptions(bgColor: bgColor),
   );
 }

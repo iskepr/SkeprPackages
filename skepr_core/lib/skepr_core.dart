@@ -8,6 +8,7 @@ export "core/helpers/hive_helper.dart";
 export "core/services/database_client.dart";
 export "core/services/device_service.dart";
 export "core/services/supabase_service.dart";
+export "core/services/sound_helper.dart";
 
 // utils
 export "core/utils/check_internet.dart";

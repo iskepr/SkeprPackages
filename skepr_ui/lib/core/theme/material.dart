@@ -114,7 +114,7 @@ class MyMaterial extends StatelessWidget {
 
   Border _buildBorder(BuildContext context) {
     final side = BorderSide(color: context.border, width: 0.7);
-    final bool isTall = height != null && height! > 100;
+    // final bool isTall = height != null && height! > 100;
 
     return Border(
       top: side,
