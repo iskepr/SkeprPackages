@@ -38,6 +38,8 @@ class Section<T> extends StatefulWidget {
     this.itemBuilder,
     this.searchMatcher,
     this.searchButton,
+    this.collapsible = false,
+    this.initiallyExpanded = true,
   }) : assert(title is String || title is Widget || title == null);
 
   final dynamic title;
@@ -59,6 +61,8 @@ class Section<T> extends StatefulWidget {
   final Widget Function(BuildContext c, T item, int index)? itemBuilder;
   final String Function(T item)? searchMatcher;
   final Function(String query)? searchButton;
+  final bool collapsible;
+  final bool initiallyExpanded;
 
   @override
   State<Section<T>> createState() => _SectionState<T>();
@@ -81,9 +85,12 @@ class _SectionState<T> extends State<Section<T>> {
   List<int> selectedFilters = [0];
   Map<int, bool> toggledStates = {};
 
+  late bool isExpanded;
+
   @override
   void initState() {
     super.initState();
+    isExpanded = widget.initiallyExpanded;
     withSearch =
         isBigData &&
         (widget.searchMatcher != null || widget.searchButton != null);
@@ -129,6 +136,12 @@ class _SectionState<T> extends State<Section<T>> {
           title: l10n.refresh,
           onTap: widget.refresh!,
           icon: LucideIcons.refreshCw,
+        ),
+      if (widget.collapsible)
+        SectionHeaderButton(
+          title: isExpanded ? "تصغير" : "توسيع",
+          onTap: () => setState(() => isExpanded = !isExpanded),
+          icon: isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
         ),
     ];
   }
@@ -215,7 +228,7 @@ class _SectionState<T> extends State<Section<T>> {
               centerTitle: widget.centerTitle,
             ),
 
-          if (withSearch)
+          if (withSearch && isExpanded)
             SectionSearchInput(
               enableSearch: enableSearch,
               focusNode: _focusNode,
@@ -229,7 +242,7 @@ class _SectionState<T> extends State<Section<T>> {
               },
             ),
 
-          if (widget.sortOptions.isNotEmpty)
+          if (widget.sortOptions.isNotEmpty && isExpanded)
             SectionSorts<T>(
               enableSorting: enableSorting,
               selectedSort: selectedSort,
@@ -247,7 +260,7 @@ class _SectionState<T> extends State<Section<T>> {
               },
             ),
 
-          if (widget.filterOptions.isNotEmpty)
+          if (widget.filterOptions.isNotEmpty && isExpanded)
             SectionFilters<T>(
               enableFilter: enableFilter,
               selectedFilters: selectedFilters,
@@ -263,12 +276,14 @@ class _SectionState<T> extends State<Section<T>> {
             hasBorder: widget.hasBorder,
             hasShadow: false,
             bg: widget.bg ?? (widget.hasBG ? null : Colors.transparent),
-            padding: widget.padding,
+            padding: isExpanded ? widget.padding : EdgeInsets.zero,
             child: AnimatedSize(
               duration: kAnimationSlowerDuration,
               curve: kCurveEaseInOut,
               alignment: Alignment.topCenter,
-              child: widget.isLoading
+              child: !isExpanded
+                  ? const SizedBox.shrink()
+                  : widget.isLoading
                   ? const Loading()
                   : (widget.listData != null && widget.itemBuilder != null)
                   ? SectionList<T>(
