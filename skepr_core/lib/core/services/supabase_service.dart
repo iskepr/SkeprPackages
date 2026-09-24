@@ -10,12 +10,16 @@ class SupabaseService extends DatabaseClient {
   Session? get currentSession => _supabase.auth.currentSession;
 
   @override
-  Future<void> init({required String url, required String anonKey}) =>
-      Supabase.initialize(
-        url: url,
-        anonKey: anonKey,
-        authOptions: const FlutterAuthClientOptions(autoRefreshToken: true),
-      );
+  Future<void> init({
+    required String url,
+    required String anonKey,
+    Map<String, String>? headers,
+  }) => Supabase.initialize(
+    url: url,
+    anonKey: anonKey,
+    authOptions: const FlutterAuthClientOptions(autoRefreshToken: true),
+    headers: headers,
+  );
 
   @override
   Future<AuthResponse> signUp({

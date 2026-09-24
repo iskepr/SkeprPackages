@@ -5,7 +5,11 @@ import "package:skepr_core/skepr_core.dart";
 abstract class DatabaseClient {
   dynamic get currentSession;
 
-  Future<void> init({required String url, required String anonKey});
+  Future<void> init({
+    required String url,
+    required String anonKey,
+    Map<String, String>? headers,
+  });
 
   Future<dynamic> signUp({
     required String name,
