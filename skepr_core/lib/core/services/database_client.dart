@@ -22,6 +22,12 @@ abstract class DatabaseClient {
   Future<void> signOut();
   Future<Map<String, dynamic>> function(String name, Map<String, dynamic> body);
 
+  Future<dynamic> rpc(
+    String functionName, {
+    Map<String, dynamic>? params,
+    bool silentException = false,
+  });
+
   Future<dynamic> insert<T>(
     String tableName, {
     required dynamic data,

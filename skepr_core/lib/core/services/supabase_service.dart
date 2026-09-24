@@ -80,6 +80,33 @@ class SupabaseService extends DatabaseClient {
   }
 
   @override
+  Future<dynamic> rpc(
+    String functionName, {
+    Map<String, dynamic>? params,
+    bool silentException = false,
+  }) async {
+    try {
+      final response = await _supabase.rpc(
+        functionName,
+        params: params ?? const {},
+      );
+      return response;
+    } on PostgrestException catch (e, t) {
+      if (silentException) rethrow;
+      showError(
+        "RPC Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint} | Track: $t",
+        "rpc_$functionName",
+        userMessage: "تنفيذ العملية",
+      );
+      return null;
+    } catch (e, t) {
+      if (silentException) rethrow;
+      showError("$e - $t", "rpc_$functionName", userMessage: "تنفيذ العملية");
+      return null;
+    }
+  }
+
+  @override
   Future<dynamic> insert<T>(
     String tableName, {
     required dynamic data,
@@ -290,7 +317,7 @@ class SupabaseService extends DatabaseClient {
       await query;
     } catch (e, t) {
       showError("$e - $t", "upsert_$tableName", userMessage: "الحذف");
-      throw e;
+      rethrow;
     }
   }
 

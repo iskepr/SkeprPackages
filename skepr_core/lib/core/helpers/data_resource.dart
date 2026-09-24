@@ -6,7 +6,6 @@ const String kFisDeleted = "is_deleted";
 const String kFupdatedAt = "updated_at";
 const String kFid = "id";
 
-// مفاتيح التخزين داخل نفس البوكس
 const String kCacheMetaDependency = "__dep__";
 const String kCacheMetaLastFetch = "__time__";
 const String kCacheDefaultDataKey = "__data__";
@@ -29,9 +28,9 @@ class DataResource<T> {
   }) async {
     try {
       final effectiveDataKey = subKey ?? kCacheDefaultDataKey;
-      bool needsFullRefresh = isForceRefresh;
+      bool dependencyChanged = false;
 
-      // 1. التحقق من مفتاح التبعية
+      // 1. فحص التبعية (إذا تغيرت الشعبة أو الكورسات نجلب كل شيء من جديد)
       if (dependencyKey != null) {
         try {
           final oldDepKey = HiveHelper.getData<String>(
@@ -39,71 +38,92 @@ class DataResource<T> {
             key: kCacheMetaDependency,
           );
           if (oldDepKey != dependencyKey) {
-            needsFullRefresh = true;
+            dependencyChanged = true;
           }
         } catch (_) {}
       }
 
-      // 2. التحقق من صلاحية الكاش (TTL)
-      if (validDuration != null && !needsFullRefresh) {
-        try {
-          final lastFetchStr = HiveHelper.getData<String>(
-            cacheKey,
-            key: kCacheMetaLastFetch,
-          );
-          if (lastFetchStr != null) {
-            final lastFetch = DateTime.parse(lastFetchStr);
-            if (DateTime.now().difference(lastFetch) > validDuration) {
-              needsFullRefresh = true;
-            }
-          } else {
-            needsFullRefresh = true;
-          }
-        } catch (_) {}
-      }
-
-      // 3. جلب الداتا المتكاشة بمفتاح محدد لتجنب التضارب
+      // 2. قراءة الكاش المحلي أولاً بدون انتظار
       List<T> cachedData = [];
       try {
         cachedData = HiveHelper.getListDataByKey<T>(cacheKey, effectiveDataKey);
-      } catch (e) {
+      } catch (_) {
         cachedData = [];
       }
 
       final List<T> currentData = List.from(cachedData);
+      final bool hasCache = currentData.isNotEmpty;
 
+      // عرض الكاش للمستخدم فوراً لتفادي شاشات التحميل
+      if (hasCache) {
+        onLoading(currentData);
+      }
+
+      // 3. فحص هل نحتاج طلب بيانات من السيرفر أصلاً؟
       String? lastSyncTime;
-      if (currentData.isNotEmpty && !needsFullRefresh) {
-        try {
-          lastSyncTime = HiveHelper.getData<String>(
-            cacheKey,
-            key: kCacheMetaLastFetch,
-          );
-        } catch (_) {}
-        onLoading(currentData);
-      } else if (needsFullRefresh) {
-        onLoading(currentData);
-      }
-
-      if (!await internetIsConnected) return;
-
-      dynamic response;
       try {
-        response = await fetcher(lastSyncTime);
-      } catch (e) {
-        debugPrint("Fetcher with lastSync failed: $e");
-      }
-      debugPrint(response.toString());
+        lastSyncTime = HiveHelper.getData<String>(
+          cacheKey,
+          key: kCacheMetaLastFetch,
+        );
+      } catch (_) {}
 
-      final List rawList = (response is List) ? response : [];
-      if (rawList.isEmpty && currentData.isNotEmpty && !needsFullRefresh) {
+      bool shouldFetchFromServer =
+          isForceRefresh || !hasCache || dependencyChanged;
+
+      if (!shouldFetchFromServer &&
+          validDuration != null &&
+          lastSyncTime != null) {
+        final lastFetch = DateTime.tryParse(lastSyncTime);
+        if (lastFetch != null) {
+          shouldFetchFromServer =
+              DateTime.now().toUtc().difference(lastFetch) > validDuration;
+        } else {
+          shouldFetchFromServer = true;
+        }
+      }
+
+      // إذا كان الكاش سارياً ولم تنتهِ مدته، لا داعي للاتصال بالإنترنت نهائياً
+      if (!shouldFetchFromServer && hasCache) {
         onSuccess(currentData);
         return;
       }
-      List<T> data;
 
-      // دمج التعديلات لو مش تحديث كامل
-      if (getId != null && currentData.isNotEmpty && !needsFullRefresh) {
+      // إرسال الطلب (مع استخدام lastSyncTime للمزامنة الجزئية إذا لم تتغير التبعية)
+      final String? effectiveSyncTime =
+          (isForceRefresh || dependencyChanged || !hasCache)
+          ? null
+          : lastSyncTime;
+
+      dynamic response;
+      try {
+        response = await fetcher(effectiveSyncTime);
+      } catch (e) {
+        debugPrint("Fetcher failed: $e");
+        if (hasCache) {
+          onSuccess(currentData);
+          return;
+        }
+        rethrow;
+      }
+
+      final List rawList = (response is List) ? response : [];
+
+      // إذا لم يرجع الخادم أي تعديلات جديدة
+      if (rawList.isEmpty && hasCache && effectiveSyncTime != null) {
+        await HiveHelper.saveData<String>(
+          cacheKey,
+          DateTime.now().toUtc().toIso8601String(),
+          key: kCacheMetaLastFetch,
+        );
+        onSuccess(currentData);
+        return;
+      }
+
+      List<T> finalData;
+
+      // دمج التعديلات والمسح مع الكاش المحلي
+      if (getId != null && hasCache && effectiveSyncTime != null) {
         final Map<dynamic, T> dataMap = {
           for (var item in currentData) getId(item): item,
         };
@@ -111,29 +131,34 @@ class DataResource<T> {
         for (var raw in rawList) {
           final row = Map<String, dynamic>.from(raw as Map);
           final isDeleted = row[kFisDeleted] == true;
-          final newId = row[remoteIdKey];
+          final dynamic itemId = row[remoteIdKey];
 
           if (isDeleted) {
-            dataMap.remove(newId);
+            dataMap.remove(itemId);
           } else {
-            dataMap[newId] = mapper(row);
+            dataMap[itemId] = mapper(row);
           }
         }
-        data = dataMap.values.toList();
+        finalData = dataMap.values.toList();
       } else {
-        data = rawList
+        // استبدال كامل في حال الفحص لأول مرة أو التحديث القسري
+        finalData = rawList
             .where((raw) => (raw as Map)[kFisDeleted] != true)
             .map<T>((raw) => mapper(Map<String, dynamic>.from(raw as Map)))
             .toList();
       }
 
       if (processor != null) {
-        data = processor(data);
+        finalData = processor(finalData);
       }
 
-      // 4. حفظ البيانات والميتاداتا داخل نفس البوكس بمفاتيح منفصلة
+      // 4. حفظ البيانات والميتاداتا
       try {
-        await HiveHelper.saveListDataByKey<T>(cacheKey, effectiveDataKey, data);
+        await HiveHelper.saveListDataByKey<T>(
+          cacheKey,
+          effectiveDataKey,
+          finalData,
+        );
 
         if (dependencyKey != null) {
           await HiveHelper.saveData<String>(
@@ -152,7 +177,7 @@ class DataResource<T> {
         debugPrint("Hive Save Warning: $e");
       }
 
-      onSuccess(data);
+      onSuccess(finalData);
     } catch (e, t) {
       showError("$e - $t", cacheKey, userMessage: "تحديث البيانات");
       onError("حصلت مشكلة في جلب البيانات");
