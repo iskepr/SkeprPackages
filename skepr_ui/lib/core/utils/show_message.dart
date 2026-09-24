@@ -41,11 +41,20 @@ void showMessage(
         SnackBar(
           content: Center(
             child: finalIcon != null
-                ? TextIcon(
-                    msg,
-                    icon: finalIcon,
-                    size: kLargeFont - 2,
-                    color: Colors.white,
+                ? Row(
+                    spacing: 5,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon),
+                      Flexible(
+                        child: Text(
+                          msg,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   )
                 : SelectableText(
                     msg,
