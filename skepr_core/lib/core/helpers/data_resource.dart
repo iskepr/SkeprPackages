@@ -6,8 +6,6 @@ const String kFisDeleted = "is_deleted";
 const String kFupdatedAt = "updated_at";
 const String kFid = "id";
 
-const String kCacheMetaDependency = "__dep__";
-const String kCacheMetaLastFetch = "__time__";
 const String kCacheDefaultDataKey = "__data__";
 
 class DataResource<T> {
@@ -28,22 +26,43 @@ class DataResource<T> {
   }) async {
     try {
       final effectiveDataKey = subKey ?? kCacheDefaultDataKey;
-      bool dependencyChanged = false;
+      final metaTimeKey = "${effectiveDataKey}__time__";
+      final metaDepKey = "${effectiveDataKey}__dep__";
 
-      // 1. فحص التبعية (إذا تغيرت الشعبة أو الكورسات نجلب كل شيء من جديد)
+      bool needsFullRefresh = isForceRefresh;
+
+      // 1. فحص التبعية
       if (dependencyKey != null) {
         try {
           final oldDepKey = HiveHelper.getData<String>(
             cacheKey,
-            key: kCacheMetaDependency,
+            key: metaDepKey,
           );
           if (oldDepKey != dependencyKey) {
-            dependencyChanged = true;
+            needsFullRefresh = true;
           }
         } catch (_) {}
       }
 
-      // 2. قراءة الكاش المحلي أولاً بدون انتظار
+      // 2. فحص صلاحية الكاش (TTL)
+      String? lastSyncTime;
+      try {
+        lastSyncTime = HiveHelper.getData<String>(cacheKey, key: metaTimeKey);
+      } catch (_) {}
+
+      if (validDuration != null && !needsFullRefresh && lastSyncTime != null) {
+        final lastFetch = DateTime.tryParse(lastSyncTime);
+        if (lastFetch != null) {
+          final diff = DateTime.now().toUtc().difference(lastFetch.toUtc());
+          if (diff > validDuration) {
+            needsFullRefresh = true;
+          }
+        } else {
+          needsFullRefresh = true;
+        }
+      }
+
+      // 3. جلب الكاش وعرضه فوراً لمنع تعليق الـ UI
       List<T> cachedData = [];
       try {
         cachedData = HiveHelper.getListDataByKey<T>(cacheKey, effectiveDataKey);
@@ -52,55 +71,41 @@ class DataResource<T> {
       }
 
       final List<T> currentData = List.from(cachedData);
-      final bool hasCache = currentData.isNotEmpty;
-
-      // عرض الكاش للمستخدم فوراً لتفادي شاشات التحميل
-      if (hasCache) {
+      if (currentData.isNotEmpty) {
         onLoading(currentData);
       }
 
-      // 3. فحص هل نحتاج طلب بيانات من السيرفر أصلاً؟
-      String? lastSyncTime;
-      try {
-        lastSyncTime = HiveHelper.getData<String>(
-          cacheKey,
-          key: kCacheMetaLastFetch,
-        );
-      } catch (_) {}
-
-      bool shouldFetchFromServer =
-          isForceRefresh || !hasCache || dependencyChanged;
-
-      if (!shouldFetchFromServer &&
+      // 4. لو الكاش ساري ومش مطلوب Full Refresh، والمدة لم تنتهِ
+      if (!needsFullRefresh &&
           validDuration != null &&
-          lastSyncTime != null) {
-        final lastFetch = DateTime.tryParse(lastSyncTime);
-        if (lastFetch != null) {
-          shouldFetchFromServer =
-              DateTime.now().toUtc().difference(lastFetch) > validDuration;
-        } else {
-          shouldFetchFromServer = true;
+          currentData.isNotEmpty) {
+        final lastFetch = DateTime.tryParse(lastSyncTime ?? "");
+        if (lastFetch != null &&
+            DateTime.now().toUtc().difference(lastFetch.toUtc()) <=
+                validDuration) {
+          onSuccess(currentData);
+          return;
         }
       }
 
-      // إذا كان الكاش سارياً ولم تنتهِ مدته، لا داعي للاتصال بالإنترنت نهائياً
-      if (!shouldFetchFromServer && hasCache) {
-        onSuccess(currentData);
+      // 5. فحص اتصال الإنترنت
+      if (kIsWeb ? false : !await internetIsConnected) {
+        if (currentData.isNotEmpty) {
+          onSuccess(currentData);
+        } else {
+          onError("لا يوجد اتصال بالإنترنت");
+        }
         return;
       }
 
-      // إرسال الطلب (مع استخدام lastSyncTime للمزامنة الجزئية إذا لم تتغير التبعية)
-      final String? effectiveSyncTime =
-          (isForceRefresh || dependencyChanged || !hasCache)
-          ? null
-          : lastSyncTime;
-
+      // 6. استدعاء السيرفر
+      final syncTimeForFetcher = needsFullRefresh ? null : lastSyncTime;
       dynamic response;
       try {
-        response = await fetcher(effectiveSyncTime);
+        response = await fetcher(syncTimeForFetcher);
       } catch (e) {
-        debugPrint("Fetcher failed: $e");
-        if (hasCache) {
+        debugPrint("DataResource Fetcher Error: $e");
+        if (currentData.isNotEmpty) {
           onSuccess(currentData);
           return;
         }
@@ -109,21 +114,20 @@ class DataResource<T> {
 
       final List rawList = (response is List) ? response : [];
 
-      // إذا لم يرجع الخادم أي تعديلات جديدة
-      if (rawList.isEmpty && hasCache && effectiveSyncTime != null) {
+      // لو مفيش تعديلات جديدة والسيرفر رجع فاضي
+      if (rawList.isEmpty && currentData.isNotEmpty && !needsFullRefresh) {
         await HiveHelper.saveData<String>(
           cacheKey,
           DateTime.now().toUtc().toIso8601String(),
-          key: kCacheMetaLastFetch,
+          key: metaTimeKey,
         );
         onSuccess(currentData);
         return;
       }
 
-      List<T> finalData;
-
-      // دمج التعديلات والمسح مع الكاش المحلي
-      if (getId != null && hasCache && effectiveSyncTime != null) {
+      // 7. دمج البيانات
+      List<T> data;
+      if (getId != null && currentData.isNotEmpty && !needsFullRefresh) {
         final Map<dynamic, T> dataMap = {
           for (var item in currentData) getId(item): item,
         };
@@ -131,53 +135,48 @@ class DataResource<T> {
         for (var raw in rawList) {
           final row = Map<String, dynamic>.from(raw as Map);
           final isDeleted = row[kFisDeleted] == true;
-          final dynamic itemId = row[remoteIdKey];
+          final newId = row[remoteIdKey];
 
           if (isDeleted) {
-            dataMap.remove(itemId);
+            dataMap.remove(newId);
           } else {
-            dataMap[itemId] = mapper(row);
+            dataMap[newId] = mapper(row);
           }
         }
-        finalData = dataMap.values.toList();
+        data = dataMap.values.toList();
       } else {
-        // استبدال كامل في حال الفحص لأول مرة أو التحديث القسري
-        finalData = rawList
+        data = rawList
             .where((raw) => (raw as Map)[kFisDeleted] != true)
             .map<T>((raw) => mapper(Map<String, dynamic>.from(raw as Map)))
             .toList();
       }
 
       if (processor != null) {
-        finalData = processor(finalData);
+        data = processor(data);
       }
 
-      // 4. حفظ البيانات والميتاداتا
+      // 8. حفظ البيانات والـ Meta بالمفاتيح الصحيحة
       try {
-        await HiveHelper.saveListDataByKey<T>(
-          cacheKey,
-          effectiveDataKey,
-          finalData,
-        );
+        await HiveHelper.saveListDataByKey<T>(cacheKey, effectiveDataKey, data);
 
         if (dependencyKey != null) {
           await HiveHelper.saveData<String>(
             cacheKey,
             dependencyKey,
-            key: kCacheMetaDependency,
+            key: metaDepKey,
           );
         }
 
         await HiveHelper.saveData<String>(
           cacheKey,
           DateTime.now().toUtc().toIso8601String(),
-          key: kCacheMetaLastFetch,
+          key: metaTimeKey,
         );
       } catch (e) {
         debugPrint("Hive Save Warning: $e");
       }
 
-      onSuccess(finalData);
+      onSuccess(data);
     } catch (e, t) {
       showError("$e - $t", cacheKey, userMessage: "تحديث البيانات");
       onError("حصلت مشكلة في جلب البيانات");
