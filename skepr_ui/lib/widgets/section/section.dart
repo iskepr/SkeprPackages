@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 import "package:skepr_ui/skepr_ui.dart";
 import "package:skepr_ui/widgets/loading.dart";
@@ -10,7 +12,7 @@ export "package:skepr_ui/widgets/section/section_sorts.dart";
 
 enum SectionToggle { search, sort, filter }
 
-const int kDefultSectionListLimit = 6;
+const int kDefultSectionListLimit = 5;
 
 class Section<T> extends StatefulWidget {
   const Section({
@@ -69,12 +71,13 @@ class Section<T> extends StatefulWidget {
 }
 
 class _SectionState<T> extends State<Section<T>> {
-  bool isBigData = true;
+  static const _searchDebounceDuration = Duration(milliseconds: 300);
+
   String _searchQuery = "";
   bool enableSearch = false;
-  bool withSearch = false;
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _controller = TextEditingController();
+  Timer? _searchDebounceTimer;
 
   bool enableSorting = false;
   int selectedSort = 0;
@@ -87,14 +90,51 @@ class _SectionState<T> extends State<Section<T>> {
 
   late bool isExpanded;
 
+  bool _dirty = true;
+  List<T> _processedData = <T>[];
+  List<String>? _searchIndex;
+
+  bool get _withSearch =>
+      widget.searchMatcher != null || widget.searchButton != null;
+
   @override
   void initState() {
     super.initState();
     isExpanded = widget.initiallyExpanded;
-    withSearch =
-        isBigData &&
-        (widget.searchMatcher != null || widget.searchButton != null);
+    _rebuildFilterOptions();
+  }
 
+  @override
+  void didUpdateWidget(covariant Section<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.listData, widget.listData) ||
+        oldWidget.listData?.length != widget.listData?.length ||
+        oldWidget.searchMatcher != widget.searchMatcher) {
+      _dirty = true;
+      _searchIndex = null;
+    }
+
+    if (!identical(oldWidget.sortOptions, widget.sortOptions) ||
+        oldWidget.sortOptions.length != widget.sortOptions.length) {
+      _dirty = true;
+
+      if (widget.sortOptions.isEmpty) {
+        selectedSort = 0;
+        isAscending = false;
+      } else if (selectedSort >= widget.sortOptions.length) {
+        selectedSort = widget.sortOptions.length - 1;
+      }
+    }
+
+    if (!identical(oldWidget.filterOptions, widget.filterOptions) ||
+        oldWidget.filterOptions.length != widget.filterOptions.length) {
+      _dirty = true;
+      _rebuildFilterOptions();
+    }
+  }
+
+  void _rebuildFilterOptions() {
     filterOptions = widget.filterOptions.isNotEmpty
         ? [
             SectionFilterEntity(
@@ -105,6 +145,29 @@ class _SectionState<T> extends State<Section<T>> {
             ...widget.filterOptions,
           ]
         : [];
+
+    if (filterOptions.isEmpty) {
+      selectedFilters = [0];
+      toggledStates.clear();
+      return;
+    }
+
+    selectedFilters.removeWhere((i) => i < 0 || i >= filterOptions.length);
+
+    if (selectedFilters.isEmpty ||
+        (selectedFilters.length == 1 && selectedFilters.first == 0)) {
+      selectedFilters = [0];
+    } else {
+      selectedFilters.remove(0);
+      if (selectedFilters.isEmpty) selectedFilters.add(0);
+    }
+
+    toggledStates.removeWhere(
+      (key, value) =>
+          key < 0 ||
+          key >= filterOptions.length ||
+          !selectedFilters.contains(key),
+    );
   }
 
   List<SectionHeaderButton> _buildActions(List<T> filteredList) {
@@ -112,20 +175,19 @@ class _SectionState<T> extends State<Section<T>> {
       ...widget.actionButtons,
       if (widget.actionButtonsBuilder != null)
         ...widget.actionButtonsBuilder!(filteredList),
-
-      if (filterOptions.isNotEmpty && isBigData)
+      if (filterOptions.isNotEmpty)
         SectionHeaderButton(
           title: "فلتر",
           onTap: () => toggleAction(SectionToggle.filter),
           icon: LucideIcons.listFilter,
         ),
-      if (widget.sortOptions.isNotEmpty && isBigData)
+      if (widget.sortOptions.isNotEmpty)
         SectionHeaderButton(
           title: l10n.sortBy,
           onTap: () => toggleAction(SectionToggle.sort),
           icon: LucideIcons.arrowUpDown,
         ),
-      if (withSearch)
+      if (_withSearch)
         SectionHeaderButton(
           title: l10n.search,
           onTap: () => toggleAction(SectionToggle.search),
@@ -154,152 +216,127 @@ class _SectionState<T> extends State<Section<T>> {
     });
 
     if (enableSearch) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _focusNode.requestFocus(),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
     } else {
+      _searchDebounceTimer?.cancel();
       _focusNode.unfocus();
       _controller.clear();
+
       if (_searchQuery.isNotEmpty) {
-        setState(() => _searchQuery = "");
+        setState(() {
+          _searchQuery = "";
+          _dirty = true;
+        });
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    List<T> resultList = List.from(widget.listData ?? []);
+  void _onSearchChanged(String? value) {
+    final query = value ?? "";
 
-    // البحث
-    if (_searchQuery.isNotEmpty && widget.searchMatcher != null) {
-      final searchWords = _searchQuery.trim().toLowerCase().split(
-        RegExp(r"\s+"),
-      );
-      resultList = resultList.where((item) {
-        final searchableData = widget.searchMatcher!(item).toLowerCase();
-        return searchWords.every((word) => searchableData.contains(word));
-      }).toList();
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(_searchDebounceDuration, () {
+      if (!mounted) return;
+
+      widget.searchButton?.call(query);
+
+      if (widget.searchButton == null && _searchQuery != query) {
+        setState(() {
+          _searchQuery = query;
+          _dirty = true;
+        });
+      }
+    });
+  }
+
+  void _ensureSearchIndex(List<T> source) {
+    if (_searchIndex != null && _searchIndex!.length == source.length) return;
+
+    _searchIndex = source
+        .map((item) => widget.searchMatcher!(item).toLowerCase())
+        .toList(growable: false);
+  }
+
+  List<T> _applyFilters(List<T> items) {
+    final grouped = <String, List<bool Function(T)>>{};
+
+    for (final index in selectedFilters) {
+      if (index <= 0 || index >= filterOptions.length) continue;
+
+      final filter = filterOptions[index];
+      final groupName = filter.group ?? "general";
+      final isToggled = toggledStates[index] ?? false;
+
+      final condition = (isToggled && filter.toggleCondition != null)
+          ? filter.toggleCondition
+          : filter.condition;
+
+      grouped
+          .putIfAbsent(groupName, () => <bool Function(T)>[])
+          .add(condition ?? ((T _) => true));
     }
 
-    // الترتيب
-    if (widget.sortOptions.isNotEmpty) {
-      final compareFunc = widget.sortOptions[selectedSort].compare;
-      resultList.sort(
+    if (grouped.isEmpty) return items;
+
+    return items.where((item) {
+      for (final predicates in grouped.values) {
+        var any = false;
+        for (final predicate in predicates) {
+          if (predicate(item)) {
+            any = true;
+            break;
+          }
+        }
+        if (!any) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<T> _computeProcessedData() {
+    final source = widget.listData;
+    if (source == null || source.isEmpty) return <T>[];
+
+    List<T> result;
+
+    // 1. Search with Index
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty && widget.searchMatcher != null) {
+      _ensureSearchIndex(source);
+      final searchWords = query.split(RegExp(r"\s+"));
+      final filtered = <T>[];
+
+      for (var i = 0; i < source.length; i++) {
+        final searchable = _searchIndex![i];
+        if (searchWords.every(searchable.contains)) {
+          filtered.add(source[i]);
+        }
+      }
+      result = filtered;
+    } else {
+      result = List<T>.of(source);
+    }
+
+    // 2. Filter
+    if (filterOptions.isNotEmpty && !selectedFilters.contains(0)) {
+      result = _applyFilters(result);
+    }
+
+    // 3. Sort (safe on copied list)
+    if (widget.sortOptions.isNotEmpty && result.length > 1) {
+      final sortIndex =
+          (selectedSort >= 0 && selectedSort < widget.sortOptions.length)
+          ? selectedSort
+          : 0;
+      final compareFunc = widget.sortOptions[sortIndex].compare;
+      result.sort(
         (a, b) => isAscending ? compareFunc(a, b) : compareFunc(b, a),
       );
     }
 
-    // الفلترة
-    if (filterOptions.isNotEmpty && !selectedFilters.contains(0)) {
-      resultList = resultList.where((item) {
-        final Map<String, List<int>> groupedFilters = {};
-        for (var index in selectedFilters) {
-          final filter = filterOptions[index];
-          final groupName = filter.group ?? "general";
-          groupedFilters.putIfAbsent(groupName, () => []).add(index);
-        }
-
-        return groupedFilters.values.every((groupIndices) {
-          return groupIndices.any((index) {
-            final filter = filterOptions[index];
-            final isToggled = toggledStates[index] ?? false;
-            final currentCondition =
-                (isToggled && filter.toggleCondition != null)
-                ? filter.toggleCondition
-                : filter.condition;
-            return currentCondition != null ? currentCondition(item) : true;
-          });
-        });
-      }).toList();
-    }
-
-    return Container(
-      margin: widget.margin,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.title != null || _buildActions(resultList).isNotEmpty)
-            SectionHeader(
-              title: widget.title,
-              bigTitle: widget.bigTitle,
-              actionButtons: _buildActions(resultList),
-              isLoading: widget.isLoading,
-              listItems: resultList,
-              centerTitle: widget.centerTitle,
-            ),
-
-          if (withSearch && isExpanded)
-            SectionSearchInput(
-              enableSearch: enableSearch,
-              focusNode: _focusNode,
-              controller: _controller,
-              disableButton: widget.searchButton == null,
-              onChanged: (value) {
-                widget.searchButton?.call(value ?? "");
-                if (widget.searchButton == null) {
-                  setState(() => _searchQuery = value ?? "");
-                }
-              },
-            ),
-
-          if (widget.sortOptions.isNotEmpty && isExpanded)
-            SectionSorts<T>(
-              enableSorting: enableSorting,
-              selectedSort: selectedSort,
-              sorts: widget.sortOptions,
-              isAscending: isAscending,
-              onChanged: (value) {
-                setState(() {
-                  if (selectedSort == value) {
-                    isAscending = !isAscending;
-                  } else {
-                    selectedSort = value;
-                    isAscending = false;
-                  }
-                });
-              },
-            ),
-
-          if (widget.filterOptions.isNotEmpty && isExpanded)
-            SectionFilters<T>(
-              enableFilter: enableFilter,
-              selectedFilters: selectedFilters,
-              toggledStates: toggledStates,
-              filters: filterOptions,
-              onChanged: handleFilterChange,
-            ),
-
-          MyMaterial(
-            width: double.infinity,
-            borderRadius: BorderRadius.circular(kSmallBorderRadius),
-            whiteBG: widget.whiteBG,
-            hasBorder: widget.hasBorder,
-            hasShadow: false,
-            bg: widget.bg ?? (widget.hasBG ? null : Colors.transparent),
-            padding: isExpanded ? widget.padding : EdgeInsets.zero,
-            child: AnimatedSize(
-              duration: kAnimationSlowerDuration,
-              curve: kCurveEaseInOut,
-              alignment: Alignment.topCenter,
-              child: !isExpanded
-                  ? const SizedBox.shrink()
-                  : widget.isLoading
-                  ? const Loading()
-                  : (widget.listData != null && widget.itemBuilder != null)
-                  ? SectionList<T>(
-                      listItems: resultList,
-                      errorMessage: widget.errorMessage,
-                      emptyMessage: widget.emptyMessage,
-                      padding: widget.padding,
-                      lengthLimit: widget.lengthLimit,
-                      itemBuilder: widget.itemBuilder!,
-                    )
-                  : (widget.child ?? const SizedBox.shrink()),
-            ),
-          ),
-        ],
-      ),
-    );
+    return result;
   }
 
   void handleFilterChange(int index) {
@@ -308,6 +345,8 @@ class _SectionState<T> extends State<Section<T>> {
         selectedFilters = [0];
         toggledStates.clear();
       } else {
+        if (index < 0 || index >= filterOptions.length) return;
+
         selectedFilters.remove(0);
         final filter = filterOptions[index];
 
@@ -324,11 +363,107 @@ class _SectionState<T> extends State<Section<T>> {
 
         if (selectedFilters.isEmpty) selectedFilters.add(0);
       }
+      _dirty = true;
     });
   }
 
   @override
+  Widget build(BuildContext context) {
+    if (_dirty) {
+      _processedData = _computeProcessedData();
+      _dirty = false;
+    }
+
+    final resultList = _processedData;
+    final actions = _buildActions(resultList);
+    final hasList = widget.listData != null && widget.itemBuilder != null;
+
+    return Container(
+      margin: widget.margin,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.title != null || actions.isNotEmpty)
+            SectionHeader(
+              title: widget.title,
+              bigTitle: widget.bigTitle,
+              actionButtons: actions,
+              isLoading: widget.isLoading,
+              listItems: resultList,
+              centerTitle: widget.centerTitle,
+            ),
+          if (_withSearch && isExpanded)
+            SectionSearchInput(
+              enableSearch: enableSearch,
+              focusNode: _focusNode,
+              controller: _controller,
+              disableButton: widget.searchButton == null,
+              onChanged: _onSearchChanged,
+            ),
+          if (widget.sortOptions.isNotEmpty && isExpanded)
+            SectionSorts<T>(
+              enableSorting: enableSorting,
+              selectedSort: selectedSort,
+              sorts: widget.sortOptions,
+              isAscending: isAscending,
+              onChanged: (value) {
+                setState(() {
+                  if (selectedSort == value) {
+                    isAscending = !isAscending;
+                  } else {
+                    selectedSort = value;
+                    isAscending = false;
+                  }
+                  _dirty = true;
+                });
+              },
+            ),
+          if (widget.filterOptions.isNotEmpty && isExpanded)
+            SectionFilters<T>(
+              enableFilter: enableFilter,
+              selectedFilters: selectedFilters,
+              toggledStates: toggledStates,
+              filters: filterOptions,
+              onChanged: handleFilterChange,
+            ),
+          MyMaterial(
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(kSmallBorderRadius),
+            whiteBG: widget.whiteBG,
+            hasBorder: widget.hasBorder,
+            hasShadow: false,
+            bg: widget.bg ?? (widget.hasBG ? null : Colors.transparent),
+            padding: isExpanded
+                ? (hasList ? EdgeInsets.zero : widget.padding)
+                : EdgeInsets.zero,
+            child: AnimatedSize(
+              duration: kAnimationSlowerDuration,
+              curve: kCurveEaseInOut,
+              alignment: Alignment.topCenter,
+              child: !isExpanded
+                  ? const SizedBox.shrink()
+                  : widget.isLoading
+                  ? const Loading()
+                  : hasList
+                  ? SectionList<T>(
+                      listItems: resultList,
+                      errorMessage: widget.errorMessage,
+                      emptyMessage: widget.emptyMessage,
+                      padding: widget.padding,
+                      lengthLimit: widget.lengthLimit,
+                      itemBuilder: widget.itemBuilder!,
+                    )
+                  : (widget.child ?? const SizedBox.shrink()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();

@@ -76,6 +76,7 @@ class _MulteSelectState<T> extends State<MulteSelect<T>> {
       title: displayTitle,
       isLoading: widget.isLoading,
       listData: widget.listData,
+      lengthLimit: 5,
       searchButton: widget.searchButton,
       searchMatcher: widget.searchMatcher,
       emptyMessage: widget.emptyMessage,
