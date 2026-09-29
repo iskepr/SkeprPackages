@@ -42,14 +42,6 @@ class AppValidators {
     if (required(value) != null) return required(value);
     final val = value!;
 
-    if (!isLogin) {
-      if (!RegExp(r"[\u0600-\u06FF]").hasMatch(val)) {
-        return "لازم تحتوي على حرف عربي واحد على الأقل";
-      }
-      if (!RegExp(r"[0-9\u0660-\u0669]").hasMatch(val)) {
-        return "اكتب رقم واحد على الأقل";
-      }
-    }
     if (val.length < 8) {
       return "لازم تكون 8 حروف على الأقل";
     }

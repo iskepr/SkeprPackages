@@ -6,6 +6,8 @@ class HiveHelper {
   static const String _syncBoxName = "sync_metadata";
   static const String _syncSuffix = "_last_sync";
 
+  static final Map<String, dynamic> _memoryIdMaps = {};
+
   static Future<void> init({
     required List<String> boxes,
     void Function()? registerAdapters,
@@ -46,6 +48,7 @@ class HiveHelper {
   static Box getBox(String boxName) => Hive.box(boxName);
 
   static Future<void> clear({required List<String> boxes}) async {
+    _memoryIdMaps.clear();
     for (var boxName in [_syncBoxName, ...boxes]) {
       if (Hive.isBoxOpen(boxName)) {
         await Hive.box(boxName).clear();
@@ -53,10 +56,35 @@ class HiveHelper {
     }
   }
 
+  static Map<K, T> getIdMap<K, T>(
+    String boxName, {
+    required K Function(T item) keySelector,
+    bool forceRefresh = false,
+  }) {
+    if (!forceRefresh && _memoryIdMaps.containsKey(boxName)) {
+      return _memoryIdMaps[boxName] as Map<K, T>;
+    }
+
+    final items = getListData<T>(boxName);
+    final map = <K, T>{for (final item in items) keySelector(item): item};
+
+    _memoryIdMaps[boxName] = map;
+    return map;
+  }
+
+  static void invalidateIdMap([String? boxName]) {
+    if (boxName != null) {
+      _memoryIdMaps.remove(boxName);
+    } else {
+      _memoryIdMaps.clear();
+    }
+  }
+
   static Future<void> saveListData<T>(String boxName, List<T> data) async {
     final box = Hive.box(boxName);
     await box.clear();
     await box.addAll(data);
+    _memoryIdMaps.remove(boxName);
   }
 
   static List<T> getListData<T>(String boxName) {
@@ -74,18 +102,6 @@ class HiveHelper {
     return result;
   }
 
-  static Future<void> saveData<T>(String boxName, T data, {String? key}) async {
-    final box = Hive.box(boxName);
-    await box.put(key ?? 0, data);
-  }
-
-  static T? getData<T>(String boxName, {String? key}) {
-    final box = Hive.box(boxName);
-    final data = box.get(key ?? 0);
-    if (data == null) return null;
-    return data as T;
-  }
-
   static List<T> getListDataByKey<T>(String boxName, String key) {
     final box = Hive.box(boxName);
     final data = box.get(key);
@@ -100,6 +116,20 @@ class HiveHelper {
   ) async {
     final box = Hive.box(boxName);
     await box.put(key, data);
+    _memoryIdMaps.remove(boxName);
+  }
+
+  static Future<void> saveData<T>(String boxName, T data, {String? key}) async {
+    final box = Hive.box(boxName);
+    await box.put(key ?? 0, data);
+    _memoryIdMaps.remove(boxName);
+  }
+
+  static T? getData<T>(String boxName, {String? key}) {
+    final box = Hive.box(boxName);
+    final data = box.get(key ?? 0);
+    if (data == null) return null;
+    return data as T;
   }
 
   static T? getTDataByKey<T>(String boxName, [dynamic key]) {
@@ -116,6 +146,7 @@ class HiveHelper {
   ]) async {
     final box = Hive.box(boxName);
     await box.put(key ?? 0, data);
+    _memoryIdMaps.remove(boxName);
   }
 
   static Future<void> saveLastSyncTime(

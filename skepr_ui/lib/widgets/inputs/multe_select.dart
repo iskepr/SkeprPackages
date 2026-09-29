@@ -15,6 +15,7 @@ class MulteSelect<T> extends StatefulWidget {
     this.searchButton,
     this.searchMatcher,
     this.initialSelectedIds = const [],
+    this.showSelectAll = true,
   });
 
   final String title;
@@ -28,6 +29,7 @@ class MulteSelect<T> extends StatefulWidget {
   final Function(String)? searchButton;
   final String Function(T item)? searchMatcher;
   final List<dynamic> initialSelectedIds;
+  final bool showSelectAll;
 
   @override
   State<MulteSelect<T>> createState() => _MulteSelectState<T>();
@@ -42,15 +44,51 @@ class _MulteSelectState<T> extends State<MulteSelect<T>> {
     selectedIds = List.from(widget.initialSelectedIds);
   }
 
+  void _toggleSelectAll() {
+    if (widget.listData.isEmpty) return;
+
+    final currentVisibleIds = widget.listData.map(widget.getItemId).toSet();
+    final isAllVisibleSelected = currentVisibleIds.every(selectedIds.contains);
+
+    setState(() {
+      if (isAllVisibleSelected) {
+        selectedIds.removeWhere(currentVisibleIds.contains);
+      } else {
+        selectedIds = {...selectedIds, ...currentVisibleIds}.toList();
+      }
+    });
+
+    widget.onSelected(selectedIds);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasItems = widget.listData.isNotEmpty;
+    final isAllSelected =
+        hasItems &&
+        widget.listData.map(widget.getItemId).every(selectedIds.contains);
+
+    final displayTitle = selectedIds.isEmpty
+        ? widget.title
+        : "${widget.title} (${selectedIds.length})";
+
     return Section<T>(
-      title: widget.title,
+      title: displayTitle,
       isLoading: widget.isLoading,
       listData: widget.listData,
       searchButton: widget.searchButton,
       searchMatcher: widget.searchMatcher,
       emptyMessage: widget.emptyMessage,
+      actionButtons: [
+        if (widget.showSelectAll && hasItems)
+          SectionHeaderButton(
+            title: isAllSelected ? "إلغاء التحديد" : "تحديد الكل",
+            icon: isAllSelected
+                ? LucideIcons.listCheck
+                : LucideIcons.listChecks,
+            onTap: _toggleSelectAll,
+          ),
+      ],
       itemBuilder: (context, item, index) {
         final id = widget.getItemId(item);
         final isSelected = selectedIds.contains(id);

@@ -182,4 +182,56 @@ class DataResource<T> {
       onError("حصلت مشكلة في جلب البيانات");
     }
   }
+
+  static Future<List<T>> updateCache<T>({
+    required String cacheKey,
+    String? subKey,
+    required List<T> Function(List<T> currentCached) updater,
+  }) async {
+    final effectiveDataKey = subKey ?? kCacheDefaultDataKey;
+    try {
+      List<T> cachedData = [];
+      try {
+        cachedData = HiveHelper.getListDataByKey<T>(cacheKey, effectiveDataKey);
+      } catch (_) {
+        cachedData = [];
+      }
+
+      final updatedData = updater(List<T>.from(cachedData));
+
+      await HiveHelper.saveListDataByKey<T>(
+        cacheKey,
+        effectiveDataKey,
+        updatedData,
+      );
+
+      return updatedData;
+    } catch (e, t) {
+      debugPrint("DataResource updateCache Error: $e - $t");
+      return [];
+    }
+  }
+
+  static Future<void> removeCache({
+    required String cacheKey,
+    String? subKey,
+  }) async {
+    final effectiveDataKey = subKey ?? kCacheDefaultDataKey;
+    final metaTimeKey = "${effectiveDataKey}__time__";
+    final metaDepKey = "${effectiveDataKey}__dep__";
+
+    try {
+      // تفريغ البيانات
+      await HiveHelper.saveListDataByKey<dynamic>(
+        cacheKey,
+        effectiveDataKey,
+        const [],
+      );
+      // تصفير الميتا داتا
+      await HiveHelper.saveData<String?>(cacheKey, null, key: metaTimeKey);
+      await HiveHelper.saveData<String?>(cacheKey, null, key: metaDepKey);
+    } catch (e, t) {
+      debugPrint("DataResource removeCache Error: $e - $t");
+    }
+  }
 }

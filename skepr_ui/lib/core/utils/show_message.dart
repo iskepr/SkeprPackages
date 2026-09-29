@@ -30,7 +30,8 @@ void showMessage(
       return true;
     });
 
-    if (isBottomSheetOpen && !PlatformUtils.isDesktop) {
+    if (PlatformUtils.isAndroid ||
+        (isBottomSheetOpen && !PlatformUtils.isDesktop)) {
       final ToastType type = isError == true
           ? ToastType.error
           : ToastType.success;
