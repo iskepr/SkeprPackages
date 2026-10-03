@@ -103,8 +103,8 @@ class DataResource<T> {
       dynamic response;
       try {
         response = await fetcher(syncTimeForFetcher);
-      } catch (e) {
-        debugPrint("DataResource Fetcher Error: $e");
+      } catch (e, t) {
+        debugPrint("DataResource Fetcher Error: $e - $t");
         if (currentData.isNotEmpty) {
           onSuccess(currentData);
           return;
