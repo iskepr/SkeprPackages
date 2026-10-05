@@ -183,6 +183,41 @@ class DataResource<T> {
     }
   }
 
+  /// تحديث أو إدراج عنصر واحد داخل الكاش بناءً على الـ id
+  static Future<List<T>> updateItem<T>({
+    required String cacheKey,
+    String? subKey,
+    required dynamic id,
+    required T item,
+    dynamic Function(T item)? getId,
+    bool insertIfNotFound = true,
+  }) async {
+    return updateCache<T>(
+      cacheKey: cacheKey,
+      subKey: subKey,
+      updater: (currentCached) {
+        final index = currentCached.indexWhere((element) {
+          if (getId != null) {
+            return getId(element) == id;
+          }
+          try {
+            return (element as dynamic).id == id;
+          } catch (_) {
+            return false;
+          }
+        });
+
+        if (index != -1) {
+          currentCached[index] = item;
+        } else if (insertIfNotFound) {
+          currentCached.add(item);
+        }
+
+        return currentCached;
+      },
+    );
+  }
+
   static Future<List<T>> updateCache<T>({
     required String cacheKey,
     String? subKey,

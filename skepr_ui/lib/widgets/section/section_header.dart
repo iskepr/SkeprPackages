@@ -6,18 +6,18 @@ class SectionHeader extends StatelessWidget {
     super.key,
     required this.title,
     required this.bigTitle,
+    required this.centerTitle,
+    required this.markdown,
     required this.actionButtons,
     required this.isLoading,
     required this.listItems,
-    required this.centerTitle,
   });
 
   final dynamic title;
-  final bool bigTitle;
+  final bool bigTitle, centerTitle, markdown;
   final List<SectionHeaderButton> actionButtons;
   final bool isLoading;
   final List listItems;
-  final bool centerTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -42,15 +42,26 @@ class SectionHeader extends StatelessWidget {
                   title is String
                       ? Expanded(
                           flex: listItems.isNotEmpty ? 0 : 1,
-                          child: SelectableText(
-                            title,
-                            textAlign: (bigTitle && centerTitle)
-                                ? TextAlign.center
-                                : null,
-                            style: TextStyle(
-                              fontSize: bigTitle ? kLargeFont : kSoSmallFont,
-                            ),
-                          ),
+                          child: markdown
+                              ? SkeprMarkdown(
+                                  content: title,
+                                  centerContent: centerTitle,
+                                  fontSize: bigTitle
+                                      ? kLargeFont
+                                      : kSoSmallFont,
+                                  padding: EdgeInsets.zero,
+                                )
+                              : SelectableText(
+                                  title,
+                                  textAlign: (bigTitle && centerTitle)
+                                      ? TextAlign.center
+                                      : null,
+                                  style: TextStyle(
+                                    fontSize: bigTitle
+                                        ? kLargeFont
+                                        : kSoSmallFont,
+                                  ),
+                                ),
                         )
                       : (title as Widget),
                   Text(

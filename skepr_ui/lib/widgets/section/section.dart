@@ -20,6 +20,7 @@ class Section<T> extends StatefulWidget {
     this.title,
     this.bigTitle = false,
     this.centerTitle = false,
+    this.markdown = false,
     this.refresh,
     this.actionButtons = const [],
     this.actionButtonsBuilder,
@@ -45,7 +46,7 @@ class Section<T> extends StatefulWidget {
   }) : assert(title is String || title is Widget || title == null);
 
   final dynamic title;
-  final bool bigTitle, centerTitle;
+  final bool bigTitle, centerTitle, markdown;
   final Function()? refresh;
   final List<SectionHeaderButton> actionButtons;
   final List<SectionHeaderButton> Function(List<T> filteredData)?
@@ -387,10 +388,11 @@ class _SectionState<T> extends State<Section<T>> {
             SectionHeader(
               title: widget.title,
               bigTitle: widget.bigTitle,
+              centerTitle: widget.centerTitle,
+              markdown: widget.markdown,
               actionButtons: actions,
               isLoading: widget.isLoading,
               listItems: resultList,
-              centerTitle: widget.centerTitle,
             ),
           if (_withSearch && isExpanded)
             SectionSearchInput(
