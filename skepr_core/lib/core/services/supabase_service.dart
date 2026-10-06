@@ -362,7 +362,7 @@ class SupabaseService extends DatabaseClient {
         case FilterOperator.notNull:
           dynamicQuery = dynamicQuery.not(filter.field, "is", null);
         case FilterOperator.notEq:
-          dynamicQuery = dynamicQuery.not(filter.field, "=", filter.value);
+          dynamicQuery = dynamicQuery.neq(filter.field, filter.value);
         case FilterOperator.not:
           if (filter.subOperator != null) {
             String supabaseOp;

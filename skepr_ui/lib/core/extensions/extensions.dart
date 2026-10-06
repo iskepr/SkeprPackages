@@ -49,12 +49,12 @@ extension TimeExtension on String {
 }
 
 extension NavigationHelpers on BuildContext {
-  void close() {
+  Future<void> close() async {
     if (!mounted) return;
 
     final navigator = Navigator.of(this);
     if (navigator.canPop()) {
-      navigator.pop();
+      await navigator.maybePop();
     } else {
       navigator.popUntil((route) => route.isFirst);
     }
