@@ -46,7 +46,6 @@ class SkeprMarkdown extends StatefulWidget {
     return TextDirection.ltr;
   }
 
-  // instances مشتركة (stateless) بدل ما تتعمل في كل build
   static const List<md.BlockSyntax> _blockSyntaxes = [_FastBlockMathSyntax()];
   static final List<md.InlineSyntax> _inlineSyntaxes = [
     _FastInlineMathSyntax(),
@@ -112,6 +111,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     );
 
     _builders = {
+      "table": _TableScrollBuilder(),
       "display-latex": _MathBuilder(
         display: true,
         bg: mathBg,
@@ -127,10 +127,21 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
         fontSize: base,
       ),
     };
-
     _sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
-      listIndent: 18,
+      listIndent: 14,
       orderedListAlign: WrapAlignment.start,
+      tableColumnWidth: const IntrinsicColumnWidth(),
+      tableCellsPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 10,
+      ),
+      tableBorder: TableBorder.all(color: border, width: 1),
+      tableHead: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: base,
+        color: text,
+      ),
+      tableBody: TextStyle(fontSize: base, color: text),
       p: ts(base).copyWith(height: 1.6),
       h1: ts(base + 11, FontWeight.w700),
       h2: ts(base + 5, FontWeight.w600),
@@ -146,13 +157,6 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: border),
       ),
-      tableBorder: TableBorder.all(color: border, width: 1),
-      tableHead: TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: base,
-        color: text,
-      ),
-      tableBody: TextStyle(fontSize: base, color: text),
       a: TextStyle(color: link, fontSize: base),
       listBullet: TextStyle(color: text, fontSize: base),
     );
@@ -162,7 +166,6 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   Widget build(BuildContext context) {
     if (_sheet == null) _buildStyle();
 
-    // selectable: false + SelectionArea واحد = أخف بكتير من SelectableText لكل فقرة
     Widget body = MarkdownBody(
       data: widget.content,
       selectable: false,
@@ -187,22 +190,30 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   }
 }
 
-/// LRU cache لـ Math widget بس (جواه الـ parse بتاع LaTeX).
-/// مفيش scroll ولا decoration هنا، فمفيش state بيتشارك.
-class _MathCache {
-  static const _max = 128;
-  static final LinkedHashMap<String, Widget> _map = LinkedHashMap();
+/// غلاف لجعل أي جدول Markdown قابلاً للتمرير أفقياً بدون أي Overflow
+class _TableScrollBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    return null; // نترك البناء الافتراضي للـ MarkdownGenerator
+  }
 
-  static Widget get(String key, Widget Function() build) {
-    final hit = _map.remove(key);
-    if (hit != null) {
-      _map[key] = hit;
-      return hit;
-    }
-    final w = build();
-    _map[key] = w;
-    if (_map.length > _max) _map.remove(_map.keys.first);
-    return w;
+  @override
+  Widget visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget? visitElementBeforeWithContext(
+    BuildContext context,
+    md.Element element, {
+    TextStyle? parentStyle,
+  }) {
+    return null;
   }
 }
 
@@ -275,9 +286,8 @@ class _MathBuilder extends MarkdownElementBuilder {
       );
     }
 
-    // بالنسبة للـ Inline: إزالة السكرول لتفادي مشاكل الحجم 0 داخل السطر العادي
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: bg,
@@ -285,8 +295,22 @@ class _MathBuilder extends MarkdownElementBuilder {
           border: Border.all(color: border, width: 0.8),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-          child: Directionality(textDirection: TextDirection.ltr, child: math),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: UnconstrainedBox(
+                  constrainedAxis: Axis.vertical,
+                  alignment: Alignment.centerLeft,
+                  child: math,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
