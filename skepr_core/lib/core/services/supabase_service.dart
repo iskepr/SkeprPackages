@@ -243,6 +243,7 @@ class SupabaseService extends DatabaseClient {
       return response;
     } catch (e, t) {
       showError("$e - $t", "update_$tableName", userMessage: "التعديل");
+      rethrow;
     }
   }
 
