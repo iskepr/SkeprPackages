@@ -14,6 +14,7 @@ class TextIcon extends StatefulWidget {
     this.tooltipTitle,
     this.hideText = false,
     this.disabled = false,
+    this.markdown = false,
     this.onPressed,
     this.withBG,
   });
@@ -24,7 +25,7 @@ class TextIcon extends StatefulWidget {
   final String? fontFamily;
   final Color? color;
   final String? tooltipTitle;
-  final bool hideText, disabled;
+  final bool hideText, disabled, markdown;
   final bool? withBG;
   final void Function()? onPressed;
 
@@ -99,16 +100,18 @@ class _TextIconState extends State<TextIcon> {
                     ? const BoxConstraints()
                     : const BoxConstraints(maxWidth: 0),
                 padding: EdgeInsetsDirectional.only(start: widget.size * 0.3),
-                child: Text(
-                  widget.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: widget.size * 0.8,
-                    color: widget.color,
-                    fontFamily: widget.fontFamily,
-                  ),
-                ),
+                child: widget.markdown
+                    ? SkeprMarkdown(content: widget.title, fontSize: widget.size,)
+                    : Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: widget.size * 0.8,
+                          color: widget.color,
+                          fontFamily: widget.fontFamily,
+                        ),
+                      ),
               ),
             ),
           ),

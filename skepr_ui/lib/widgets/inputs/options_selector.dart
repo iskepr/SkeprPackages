@@ -114,6 +114,7 @@ class _OptionsSelectorState extends State<OptionsSelector> {
         icon: icon,
         size: kSoLargeFont,
         hideText: selectedOption != null && !isSelected && widget.isExpanded,
+        markdown: option.contains("\$"),
         disabled: widget.disabled,
         color: isSelected
             ? bgColor
