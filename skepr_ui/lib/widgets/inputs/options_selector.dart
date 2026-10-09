@@ -101,6 +101,7 @@ class _OptionsSelectorState extends State<OptionsSelector> {
 
     final child = AnimatedContainer(
       duration: kAnimationFasterDuration,
+      width: 100,
       padding: const EdgeInsets.symmetric(
         vertical: kSmallPadding,
         horizontal: kLargePadding,

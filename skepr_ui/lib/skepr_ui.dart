@@ -18,7 +18,7 @@ export "./generated/skepr_localizations.dart";
 // widgets
 export "./widgets/custom_list_tile.dart";
 export "./widgets/inputs/input.dart";
-export "./widgets/markdown.dart";
+export "widgets/markdown/markdown.dart";
 export "./widgets/section/section.dart";
 export "./widgets/show_dialog.dart";
 export "./widgets/text_icon.dart";

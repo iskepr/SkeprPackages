@@ -44,7 +44,7 @@ class SectionHeader extends StatelessWidget {
                           flex: listItems.isNotEmpty ? 0 : 1,
                           child: markdown
                               ? SkeprMarkdown(
-                                  content: title,
+                                  title,
                                   centerContent: centerTitle,
                                   fontSize: bigTitle
                                       ? kLargeFont

@@ -64,11 +64,24 @@ class _TextIconState extends State<TextIcon> {
     }
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    if (_currentOpenState == this) _currentOpenState = null;
-    super.dispose();
+  double get _responsiveFontSize {
+    int spaces = 0;
+    for (int i = 0; i < widget.title.length; i++) {
+      if (widget.title.codeUnitAt(i) == 32) spaces++; // 32 كود space
+    }
+    final int wordCount = spaces + 1;
+
+    // لو كلام قليل يكبر بنسبة، ولو كتير يصغر بنسبة
+    // بحد أدنى 70% من الحجم وبحد أقصى 130%
+    if (wordCount <= 3) {
+      return widget.size * 1.25; // كلام قليل: يكبر 25%
+    } else if (wordCount <= 8) {
+      return widget.size * 0.9; // متوسط: الحجم الطبيعي
+    } else if (wordCount <= 15) {
+      return widget.size * 0.85; // كلام كتير شوية: يصغر 15%
+    } else {
+      return widget.size * 0.70; // كلام كتير جداً: يصغر 30%
+    }
   }
 
   @override
@@ -101,7 +114,16 @@ class _TextIconState extends State<TextIcon> {
                     : const BoxConstraints(maxWidth: 0),
                 padding: EdgeInsetsDirectional.only(start: widget.size * 0.3),
                 child: widget.markdown
-                    ? SkeprMarkdown(content: widget.title, fontSize: widget.size,)
+                    ? SkeprMarkdown(
+                        widget.title,
+                        padding: EdgeInsets.zero,
+                        color: widget.color,
+                        mathBgBox: false,
+                        maxWidth:
+                            MediaQuery.sizeOf(context).width -
+                            (widget.size * 7),
+                        fontSize: _responsiveFontSize,
+                      )
                     : Text(
                         widget.title,
                         maxLines: 1,
@@ -145,5 +167,12 @@ class _TextIconState extends State<TextIcon> {
     }
 
     return child;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    if (_currentOpenState == this) _currentOpenState = null;
+    super.dispose();
   }
 }
