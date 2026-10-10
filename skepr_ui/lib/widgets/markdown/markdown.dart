@@ -134,7 +134,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   void _initExpandedStates() {
     _expandedH1
       ..clear()
-      ..add(0); // أول H1 مفتوح افتراضياً
+      ..add(0); // أول H1 مفتوح
 
     _expandedH2.clear();
 
