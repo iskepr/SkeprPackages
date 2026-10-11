@@ -51,7 +51,9 @@ class SkeprMarkdown extends StatefulWidget {
     return TextDirection.ltr;
   }
 
-  static const List<md.BlockSyntax> _blockSyntaxes = <md.BlockSyntax>[];
+  static final List<md.BlockSyntax> _blockSyntaxes = <md.BlockSyntax>[
+    _FastBlockMathSyntax(),
+  ];
   static final List<md.InlineSyntax> _inlineSyntaxes = [
     _FastInlineMathSyntax(),
   ];
@@ -62,6 +64,7 @@ class SkeprMarkdown extends StatefulWidget {
 
 class _SkeprMarkdownState extends State<SkeprMarkdown> {
   static const _lazyThreshold = 4000;
+  static const _mdCacheLimit = 400;
 
   late TextDirection _direction;
   ThemeData? _theme;
@@ -72,6 +75,8 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   final Set<int> _expandedH1 = {0};
   final Set<String> _expandedH2 = {};
   bool _isProcessing = false;
+
+  final Map<String, Widget> _mdCache = {};
 
   @override
   void initState() {
@@ -85,13 +90,16 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     super.didUpdateWidget(old);
     if (old.content != widget.content) {
       _direction = SkeprMarkdown.getAutoDirection(widget.content);
+      _mdCache.clear();
       _processContent();
     }
     if (old.fontSize != widget.fontSize ||
         old.color != widget.color ||
-        old.mathBgBox != widget.mathBgBox) {
+        old.mathBgBox != widget.mathBgBox ||
+        old.onTapLink != widget.onTapLink) {
       _sheet = null;
       _builders = null;
+      _mdCache.clear();
     }
   }
 
@@ -102,6 +110,8 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     if (!identical(theme, _theme)) {
       _theme = theme;
       _sheet = null;
+      _builders = null;
+      _mdCache.clear();
     }
   }
 
@@ -203,7 +213,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     _sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       listIndent: 14,
       orderedListAlign: WrapAlignment.start,
-      tableColumnWidth: const IntrinsicColumnWidth(),
+      tableColumnWidth: const FlexColumnWidth(),
       tableCellsPadding: const EdgeInsets.symmetric(
         horizontal: 14,
         vertical: 10,
@@ -245,15 +255,26 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     );
   }
 
-  Widget _md(String data) => MarkdownBody(
-    data: data,
-    selectable: false,
-    onTapLink: widget.onTapLink,
-    blockSyntaxes: SkeprMarkdown._blockSyntaxes,
-    inlineSyntaxes: SkeprMarkdown._inlineSyntaxes,
-    builders: _builders!,
-    styleSheet: _sheet,
-  );
+  Widget _md(String data) {
+    final cached = _mdCache[data];
+    if (cached != null) return cached;
+
+    if (_mdCache.length >= _mdCacheLimit) {
+      _mdCache.remove(_mdCache.keys.first);
+    }
+
+    final w = MarkdownBody(
+      data: data,
+      selectable: false,
+      onTapLink: widget.onTapLink,
+      blockSyntaxes: SkeprMarkdown._blockSyntaxes,
+      inlineSyntaxes: SkeprMarkdown._inlineSyntaxes,
+      builders: _builders!,
+      styleSheet: _sheet,
+    );
+    _mdCache[data] = w;
+    return w;
+  }
 
   Widget _buildSubSection(int h1Index, int h2Index, SubSection sub) {
     final key = "$h1Index-$h2Index";
@@ -531,13 +552,10 @@ class _FastMathBuilder extends MarkdownElementBuilder {
 
     final inlineContent = Directionality(
       textDirection: TextDirection.ltr,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 260),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: math,
-        ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: math,
       ),
     );
 
@@ -568,5 +586,51 @@ class _FastInlineMathSyntax extends md.InlineSyntax {
     if (text.isEmpty) return false;
     parser.addNode(md.Element.text("inline-latex", text));
     return true;
+  }
+}
+
+class _FastBlockMathSyntax extends md.BlockSyntax {
+  // يطابق سطرًا يبدأ بـ $$ وينتهي بـ $$ (نفس السطر)
+  static final _sameLine = RegExp(r'^\s*\$\$(.+?)\$\$\s*$');
+
+  @override
+  RegExp get pattern => _sameLine;
+
+  @override
+  md.Node? parse(md.BlockParser parser) {
+    final line = parser.current.content;
+
+    // 1) الحالة الأولى: $$...$$ في نفس السطر
+    final m = _sameLine.firstMatch(line);
+    if (m != null) {
+      final content = m.group(1)?.trim() ?? '';
+      parser.advance();
+      return md.Element.text('display-latex', content);
+    }
+
+    // 2) الحالة الثانية: $$ في سطر، والمحتوى قد يمتد لعدة أسطر حتى $$
+    final trimmed = line.trimLeft();
+    if (!trimmed.startsWith(r'$$')) return null;
+
+    final buffer = StringBuffer();
+    buffer.write(trimmed.substring(2));
+    parser.advance();
+
+    while (!parser.isDone) {
+      final current = parser.current.content;
+      final endIdx = current.indexOf(r'$$');
+      if (endIdx != -1) {
+        buffer.write('\n');
+        buffer.write(current.substring(0, endIdx));
+        parser.advance();
+        break;
+      }
+      buffer.write('\n');
+      buffer.write(current);
+      parser.advance();
+    }
+
+    final content = buffer.toString().trim();
+    return md.Element.text('display-latex', content);
   }
 }

@@ -71,16 +71,12 @@ class _TextIconState extends State<TextIcon> {
     }
     final int wordCount = spaces + 1;
 
-    // لو كلام قليل يكبر بنسبة، ولو كتير يصغر بنسبة
-    // بحد أدنى 70% من الحجم وبحد أقصى 130%
-    if (wordCount <= 3) {
-      return widget.size * 1.25; // كلام قليل: يكبر 25%
-    } else if (wordCount <= 8) {
-      return widget.size * 0.9; // متوسط: الحجم الطبيعي
+    if (wordCount <= 8) {
+      return widget.size * 0.9;
     } else if (wordCount <= 15) {
-      return widget.size * 0.85; // كلام كتير شوية: يصغر 15%
+      return widget.size * 0.85;
     } else {
-      return widget.size * 0.70; // كلام كتير جداً: يصغر 30%
+      return widget.size * 0.70;
     }
   }
 
@@ -90,6 +86,7 @@ class _TextIconState extends State<TextIcon> {
 
     Widget child = Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         AnimatedScale(
           duration: kAnimationFasterDuration,
@@ -100,42 +97,56 @@ class _TextIconState extends State<TextIcon> {
             child: Icon(widget.icon, size: widget.size, color: widget.color),
           ),
         ),
-        AnimatedSize(
-          duration: kAnimationDuration,
-          curve: kCurveEaseInOut,
-          child: ClipRect(
-            child: AnimatedOpacity(
-              duration: kAnimationDuration,
-              curve: kCurveEaseInOut,
-              opacity: showText ? 1 : 0,
-              child: Container(
-                constraints: showText
-                    ? const BoxConstraints()
-                    : const BoxConstraints(maxWidth: 0),
-                padding: EdgeInsetsDirectional.only(start: widget.size * 0.3),
-                child: widget.markdown
-                    ? SkeprMarkdown(
-                        widget.title,
-                        padding: EdgeInsets.zero,
-                        color: widget.color,
-                        mathBgBox: false,
-                        maxWidth:
-                            MediaQuery.sizeOf(context).width -
-                            (widget.size * 7),
-                        fontSize: _responsiveFontSize,
-                      )
-                    : Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: widget.size * 0.8,
-                          color: widget.color,
-                          fontFamily: widget.fontFamily,
-                        ),
-                      ),
-              ),
+
+        Flexible(
+          child: AnimatedSwitcher(
+            duration: kAnimationDuration,
+            switchInCurve: kCurveEaseInOut,
+            switchOutCurve: kCurveEaseInOut,
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              alignment: AlignmentDirectional.centerStart,
+              clipBehavior: Clip.none,
+              children: [
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
             ),
+            transitionBuilder: (child, animation) {
+              return SizeTransition(
+                sizeFactor: animation,
+                axis: Axis.horizontal,
+                axisAlignment: -1,
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+            child: showText
+                ? Padding(
+                    key: const ValueKey("text"),
+                    padding: EdgeInsetsDirectional.only(
+                      start: widget.size * 0.3,
+                    ),
+                    child: widget.markdown
+                        ? SkeprMarkdown(
+                            widget.title,
+                            padding: EdgeInsets.zero,
+                            color: widget.color,
+                            mathBgBox: false,
+                            maxWidth:
+                                MediaQuery.sizeOf(context).width -
+                                (widget.size * 4),
+                            fontSize: _responsiveFontSize,
+                          )
+                        : Text(
+                            widget.title,
+                            softWrap: true,
+                            style: TextStyle(
+                              fontSize: widget.size * 0.8,
+                              color: widget.color,
+                              fontFamily: widget.fontFamily,
+                            ),
+                          ),
+                  )
+                : const SizedBox.shrink(key: ValueKey("empty")),
           ),
         ),
       ],
@@ -158,8 +169,8 @@ class _TextIconState extends State<TextIcon> {
     if (!widget.disabled && (widget.hideText || widget.onPressed != null)) {
       return GestureDetector(
         onTap: () {
-          if (widget.hideText) _handleTap();
           widget.onPressed?.call();
+          if (widget.hideText) _handleTap();
         },
         behavior: HitTestBehavior.opaque,
         child: child,
