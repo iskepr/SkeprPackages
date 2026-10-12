@@ -71,7 +71,8 @@ extension DateTimeFormat on DateTime {
 }
 
 extension FormateTimeDuration on Duration {
-  String get formatDuration {
+  // ساعة ودقيقتان
+  String get formatDurationText {
     if (inMinutes == 0) return l10n.notSpecified;
 
     final h = inHours;
@@ -83,6 +84,14 @@ extension FormateTimeDuration on Duration {
     if (h > 0 && m > 0) return "$hoursStr ${l10n.and} $minutesStr";
     if (h > 0) return hoursStr;
     return minutesStr;
+  }
+
+  /// تنسيق المدة: `MM:SS` أو `H:MM:SS`
+  String get formatDuration {
+    final h = inHours;
+    final m = inMinutes.remainder(60).toString().padLeft(2, "0");
+    final s = inSeconds.remainder(60).toString().padLeft(2, "0");
+    return h > 0 ? "$h:$m:$s" : "$m:$s";
   }
 }
 

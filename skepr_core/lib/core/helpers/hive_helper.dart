@@ -157,6 +157,30 @@ class HiveHelper {
     await box.put("$tableName$_syncSuffix", isoTimestamp);
   }
 
+  static Future<void> deleteData(String boxName, {String? key}) async {
+    final box = Hive.box(boxName);
+    await box.delete(key ?? 0);
+    _memoryIdMaps.remove(boxName);
+  }
+
+  static Future<void> deleteTDataByKey<T>(String boxName, [dynamic key]) async {
+    final box = Hive.box(boxName);
+    await box.delete(key ?? 0);
+    _memoryIdMaps.remove(boxName);
+  }
+
+  static Future<void> deleteListDataByKey(String boxName, String key) async {
+    final box = Hive.box(boxName);
+    await box.delete(key);
+    _memoryIdMaps.remove(boxName);
+  }
+
+  static Future<void> deleteAllData(String boxName) async {
+    final box = Hive.box(boxName);
+    await box.clear();
+    _memoryIdMaps.remove(boxName);
+  }
+
   static String? getLastSyncTime(String tableName) {
     final box = Hive.box(_syncBoxName);
     return box.get("$tableName$_syncSuffix") as String?;

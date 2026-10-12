@@ -90,6 +90,7 @@ class Header extends StatelessWidget {
         bottom: false,
         child: Row(
           spacing: kSmallPadding,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: leftSide),
 
