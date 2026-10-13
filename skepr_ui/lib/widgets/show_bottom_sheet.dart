@@ -11,6 +11,7 @@ class MyBottomSheet extends StatefulWidget {
     this.closeButton = false,
     this.isScrollable = false,
     this.actionButtons = const [],
+    this.fadeHeight = 32.0,
   });
 
   final Widget child;
@@ -20,6 +21,7 @@ class MyBottomSheet extends StatefulWidget {
   final bool closeButton;
   final bool isScrollable;
   final List<Widget> actionButtons;
+  final double fadeHeight;
 
   @override
   State<MyBottomSheet> createState() => _MyBottomSheetState();
@@ -41,9 +43,13 @@ class _MyBottomSheetState extends State<MyBottomSheet> {
         ),
         child: Stack(
           children: [
-            widget.isScrollable
-                ? _scrollableChild(controller)
-                : _buldBody(withPadding: false),
+            Positioned.fill(
+              child: _applyFade(
+                widget.isScrollable
+                    ? _scrollableChild(controller)
+                    : _buildBody(withPadding: false),
+              ),
+            ),
 
             Positioned(top: 0, left: 0, right: 0, child: _buildHeader()),
           ],
@@ -52,40 +58,56 @@ class _MyBottomSheetState extends State<MyBottomSheet> {
     );
   }
 
-  Widget _buldBody({bool withPadding = true}) {
+  Widget _applyFade(Widget child) {
+    final fade = widget.fadeHeight;
+
     return ShaderMask(
       shaderCallback: (Rect bounds) {
-        return const LinearGradient(
+        final h = bounds.height;
+        if (h <= 0) {
+          return const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.transparent, Colors.white],
+            stops: [0, 1],
+          ).createShader(bounds);
+        }
+
+        final stop = (fade / h).clamp(0.0, 1.0);
+
+        return LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.transparent, Colors.white],
-          stops: [0, 0.1],
+          colors: const [Colors.transparent, Colors.white],
+          stops: [0, stop],
         ).createShader(bounds);
       },
       blendMode: BlendMode.dstIn,
-      child: Padding(
-        padding: !withPadding
-            ? EdgeInsets.zero
-            : EdgeInsets.only(
-                left: kDefaultPadding,
-                right: kDefaultPadding,
-                top: widget.closeButton || widget.actionButtons.isNotEmpty
-                    ? kDefaultPadding * 2
-                    : kDefaultPadding,
-                bottom: kLargePadding,
-              ),
-        child: widget.child,
-      ),
+      child: child,
+    );
+  }
+
+  Widget _buildBody({bool withPadding = true}) {
+    return Padding(
+      padding: !withPadding
+          ? EdgeInsets.zero
+          : EdgeInsets.only(
+              left: kDefaultPadding,
+              right: kDefaultPadding,
+              top: widget.closeButton || widget.actionButtons.isNotEmpty
+                  ? kDefaultPadding * 2
+                  : kDefaultPadding,
+              bottom: kLargePadding,
+            ),
+      child: widget.child,
     );
   }
 
   Widget _scrollableChild(ScrollController controller) {
-    return Positioned.fill(
-      child: SingleChildScrollView(
-        controller: controller,
-        reverse: widget.reverse,
-        child: _buldBody(),
-      ),
+    return SingleChildScrollView(
+      controller: controller,
+      reverse: widget.reverse,
+      child: _buildBody(),
     );
   }
 
@@ -149,6 +171,7 @@ Future<T?> showMyBottomSheet<T>({
   bool? closeButton,
   bool isScrollable = true,
   List<Widget>? actionButtons,
+  double fadeHeight = 50,
 }) {
   return showModalBottomSheet<T>(
     context: context,
@@ -176,6 +199,7 @@ Future<T?> showMyBottomSheet<T>({
           closeButton: closeButton ?? false,
           actionButtons: actionButtons ?? [],
           isScrollable: isScrollable,
+          fadeHeight: fadeHeight,
           child: child,
         ),
       );

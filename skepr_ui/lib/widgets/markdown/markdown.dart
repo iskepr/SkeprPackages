@@ -51,6 +51,39 @@ class SkeprMarkdown extends StatefulWidget {
     return TextDirection.ltr;
   }
 
+  static String normalizeNewlines(String text) {
+    if (!text.contains(r'\n')) return text;
+
+    final real = '\n'.allMatches(text).length;
+    final literal = r'\n'.allMatches(text).length;
+    if (literal < real * 1.5) return text;
+
+    final protected = <String>[];
+    var work = text;
+
+    work = work.replaceAllMapped(RegExp(r'```[\s\S]*?```'), (m) {
+      protected.add(m.group(0)!);
+      return '\x00CB${protected.length - 1}\x00';
+    });
+
+    work = work.replaceAllMapped(RegExp(r'`[^`\n]+`'), (m) {
+      protected.add(m.group(0)!);
+      return '\x00IC${protected.length - 1}\x00';
+    });
+
+    work = work
+        .replaceAll(r'\r\n', '\n')
+        .replaceAll(r'\n', '\n')
+        .replaceAll(r'\t', '\t');
+
+    work = work.replaceAllMapped(
+      RegExp(r'\x00(CB|IC)(\d+)\x00'),
+      (m) => protected[int.parse(m.group(2)!)],
+    );
+
+    return work;
+  }
+
   static final List<md.BlockSyntax> _blockSyntaxes = <md.BlockSyntax>[
     _FastBlockMathSyntax(),
   ];
@@ -66,6 +99,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   static const _lazyThreshold = 4000;
   static const _mdCacheLimit = 400;
 
+  late String _content;
   late TextDirection _direction;
   ThemeData? _theme;
   MarkdownStyleSheet? _sheet;
@@ -81,7 +115,8 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   @override
   void initState() {
     super.initState();
-    _direction = SkeprMarkdown.getAutoDirection(widget.content);
+    _content = SkeprMarkdown.normalizeNewlines(widget.content);
+    _direction = SkeprMarkdown.getAutoDirection(_content);
     _processContent();
   }
 
@@ -89,7 +124,8 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   void didUpdateWidget(SkeprMarkdown old) {
     super.didUpdateWidget(old);
     if (old.content != widget.content) {
-      _direction = SkeprMarkdown.getAutoDirection(widget.content);
+      _content = SkeprMarkdown.normalizeNewlines(widget.content);
+      _direction = SkeprMarkdown.getAutoDirection(_content);
       _mdCache.clear();
       _processContent();
     }
@@ -116,7 +152,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   }
 
   Future<void> _processContent() async {
-    final text = widget.content;
+    final text = _content;
 
     if (text.length < _lazyThreshold) {
       final res = processChunks(ChunkRequest(text: text));
@@ -144,8 +180,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   void _initExpandedStates() {
     _expandedH1
       ..clear()
-      ..add(0); // أول H1 مفتوح
-
+      ..add(0);
     _expandedH2.clear();
 
     for (int i = 0; i < _sections.length; i++) {
@@ -153,12 +188,10 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
       if (subCount == 0) continue;
 
       if (subCount <= 2) {
-        // لو 2 أو أقل: كلهم مفتوحين
         for (int j = 0; j < subCount; j++) {
           _expandedH2.add("$i-$j");
         }
       } else {
-        // لو أكتر من 2: أول واحد بس اللي يفتح
         _expandedH2.add("$i-0");
       }
     }
@@ -334,7 +367,6 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   Widget _buildSection(int index, MarkdownSection section) {
     final isExpanded = _expandedH1.contains(index);
 
-    // لو مفيش H1 (نص في بداية الملف قبل أي عنوان رئيسي)
     if (section.header.isEmpty) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8.0),
@@ -391,7 +423,6 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
           ),
         ),
 
-        // بمجرد قفل H1، الجزء ده كله بيختفي (المحتوى + كل الـ H2 التابعة ليه)
         if (isExpanded) ...[
           if (section.body.isNotEmpty) _md(section.body),
           for (int j = 0; j < section.subSections.length; j++)
@@ -473,10 +504,6 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Fast Math Builder
-// -----------------------------------------------------------------------------
-
 class _FastMathBuilder extends MarkdownElementBuilder {
   _FastMathBuilder({
     required this.display,
@@ -491,6 +518,10 @@ class _FastMathBuilder extends MarkdownElementBuilder {
   final Color bg, border, color;
   final double fontSize;
 
+  static final _arabicRegex = RegExp(
+    r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
+  );
+
   @override
   Widget? visitElementAfterWithContext(
     BuildContext context,
@@ -499,6 +530,17 @@ class _FastMathBuilder extends MarkdownElementBuilder {
     TextStyle? parentStyle,
   ) {
     final tex = element.textContent;
+
+    if (_arabicRegex.hasMatch(tex) && !tex.contains(r'\')) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        child: Text(
+          tex,
+          style: TextStyle(fontSize: fontSize, color: color),
+          textDirection: TextDirection.rtl,
+        ),
+      );
+    }
 
     final math = Math.tex(
       tex,
@@ -590,7 +632,6 @@ class _FastInlineMathSyntax extends md.InlineSyntax {
 }
 
 class _FastBlockMathSyntax extends md.BlockSyntax {
-  // يطابق سطرًا يبدأ بـ $$ وينتهي بـ $$ (نفس السطر)
   static final _sameLine = RegExp(r'^\s*\$\$(.+?)\$\$\s*$');
 
   @override
@@ -600,7 +641,6 @@ class _FastBlockMathSyntax extends md.BlockSyntax {
   md.Node? parse(md.BlockParser parser) {
     final line = parser.current.content;
 
-    // 1) الحالة الأولى: $$...$$ في نفس السطر
     final m = _sameLine.firstMatch(line);
     if (m != null) {
       final content = m.group(1)?.trim() ?? '';
@@ -608,7 +648,6 @@ class _FastBlockMathSyntax extends md.BlockSyntax {
       return md.Element.text('display-latex', content);
     }
 
-    // 2) الحالة الثانية: $$ في سطر، والمحتوى قد يمتد لعدة أسطر حتى $$
     final trimmed = line.trimLeft();
     if (!trimmed.startsWith(r'$$')) return null;
 
