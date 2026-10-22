@@ -26,6 +26,7 @@ class TextF extends StatefulWidget {
     required this.type,
     this.keyType,
     this.autofillHints,
+    this.actionButtons,
   });
 
   final TextEditingController controller;
@@ -47,6 +48,7 @@ class TextF extends StatefulWidget {
   final InputType type;
   final TextInputType? keyType;
   final Iterable<String>? autofillHints;
+  final List<Widget>? actionButtons;
 
   @override
   State<TextF> createState() => _TextFState();
@@ -136,10 +138,14 @@ class _TextFState extends State<TextF> {
                       ),
                     ),
                   ),
+                  if (widget.actionButtons?.isNotEmpty ?? false)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: widget.actionButtons!,
+                    ),
                 ],
               ),
             ),
-
             if (state.hasError)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: kSmallPadding),

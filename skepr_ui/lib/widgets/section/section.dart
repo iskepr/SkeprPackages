@@ -40,6 +40,7 @@ class Section<T> extends StatefulWidget {
     this.errorMessage,
     this.itemBuilder,
     this.searchMatcher,
+    this.nameMatcher,
     this.searchButton,
     this.collapsible = false,
     this.initiallyExpanded = true,
@@ -63,6 +64,7 @@ class Section<T> extends StatefulWidget {
   final String? emptyMessage, errorMessage;
   final Widget Function(BuildContext c, T item, int index)? itemBuilder;
   final String Function(T item)? searchMatcher;
+  final String Function(T item)? nameMatcher;
   final Function(String query)? searchButton;
   final bool collapsible;
   final bool initiallyExpanded;
@@ -98,10 +100,39 @@ class _SectionState<T> extends State<Section<T>> {
   bool get _withSearch =>
       widget.searchMatcher != null || widget.searchButton != null;
 
+  String Function(T)? get _nameExtractor =>
+      widget.nameMatcher ?? widget.searchMatcher;
+
+  List<SectionSortEntity<T>> get _effectiveSortOptions {
+    if (widget.sortOptions.isNotEmpty) return widget.sortOptions;
+
+    final extractor = _nameExtractor;
+    if (extractor == null) return const [];
+
+    return [
+      SectionSortEntity<T>(
+        title: "الاسم",
+        iconA: LucideIcons.arrowDownAZ,
+        iconD: LucideIcons.arrowUpAZ,
+        compare: (a, b) {
+          final aName = extractor(a).toLowerCase();
+          final bName = extractor(b).toLowerCase();
+          return aName.compareTo(bName);
+        },
+      ),
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
     isExpanded = widget.initiallyExpanded;
+
+    // لو الترتيب الوحيد المتاح هو الافتراضي بالاسم، خليه تصاعدي (A→Z)
+    if (widget.sortOptions.isEmpty && _nameExtractor != null) {
+      isAscending = true;
+    }
+
     _rebuildFilterOptions();
   }
 
@@ -111,20 +142,24 @@ class _SectionState<T> extends State<Section<T>> {
 
     if (!identical(oldWidget.listData, widget.listData) ||
         oldWidget.listData?.length != widget.listData?.length ||
-        oldWidget.searchMatcher != widget.searchMatcher) {
+        oldWidget.searchMatcher != widget.searchMatcher ||
+        oldWidget.nameMatcher != widget.nameMatcher) {
       _dirty = true;
       _searchIndex = null;
     }
 
     if (!identical(oldWidget.sortOptions, widget.sortOptions) ||
-        oldWidget.sortOptions.length != widget.sortOptions.length) {
+        oldWidget.sortOptions.length != widget.sortOptions.length ||
+        oldWidget.searchMatcher != widget.searchMatcher ||
+        oldWidget.nameMatcher != widget.nameMatcher) {
       _dirty = true;
 
-      if (widget.sortOptions.isEmpty) {
+      final newSorts = _effectiveSortOptions;
+      if (newSorts.isEmpty) {
         selectedSort = 0;
         isAscending = false;
-      } else if (selectedSort >= widget.sortOptions.length) {
-        selectedSort = widget.sortOptions.length - 1;
+      } else if (selectedSort >= newSorts.length) {
+        selectedSort = newSorts.length - 1;
       }
     }
 
@@ -172,6 +207,7 @@ class _SectionState<T> extends State<Section<T>> {
   }
 
   List<SectionHeaderButton> _buildActions(List<T> filteredList) {
+    final effectiveSorts = _effectiveSortOptions;
     return [
       ...widget.actionButtons,
       if (widget.actionButtonsBuilder != null)
@@ -182,7 +218,7 @@ class _SectionState<T> extends State<Section<T>> {
           onTap: () => toggleAction(SectionToggle.filter),
           icon: LucideIcons.listFilter,
         ),
-      if (widget.sortOptions.isNotEmpty)
+      if (effectiveSorts.isNotEmpty)
         SectionHeaderButton(
           title: l10n.sortBy,
           onTap: () => toggleAction(SectionToggle.sort),
@@ -301,6 +337,7 @@ class _SectionState<T> extends State<Section<T>> {
     if (source == null || source.isEmpty) return <T>[];
 
     List<T> result;
+    final effectiveSorts = _effectiveSortOptions;
 
     // 1. Search with Index
     final query = _searchQuery.trim().toLowerCase();
@@ -326,12 +363,12 @@ class _SectionState<T> extends State<Section<T>> {
     }
 
     // 3. Sort (safe on copied list)
-    if (widget.sortOptions.isNotEmpty && result.length > 1) {
+    if (effectiveSorts.isNotEmpty && result.length > 1) {
       final sortIndex =
-          (selectedSort >= 0 && selectedSort < widget.sortOptions.length)
+          (selectedSort >= 0 && selectedSort < effectiveSorts.length)
           ? selectedSort
           : 0;
-      final compareFunc = widget.sortOptions[sortIndex].compare;
+      final compareFunc = effectiveSorts[sortIndex].compare;
       result.sort(
         (a, b) => isAscending ? compareFunc(a, b) : compareFunc(b, a),
       );
@@ -378,6 +415,7 @@ class _SectionState<T> extends State<Section<T>> {
     final resultList = _processedData;
     final actions = _buildActions(resultList);
     final hasList = widget.listData != null && widget.itemBuilder != null;
+    final effectiveSorts = _effectiveSortOptions;
 
     return Container(
       margin: widget.margin,
@@ -402,11 +440,11 @@ class _SectionState<T> extends State<Section<T>> {
               disableButton: widget.searchButton == null,
               onChanged: _onSearchChanged,
             ),
-          if (widget.sortOptions.isNotEmpty && isExpanded)
+          if (effectiveSorts.isNotEmpty && isExpanded)
             SectionSorts<T>(
               enableSorting: enableSorting,
               selectedSort: selectedSort,
-              sorts: widget.sortOptions,
+              sorts: effectiveSorts,
               isAscending: isAscending,
               onChanged: (value) {
                 setState(() {

@@ -3,22 +3,22 @@ import "dart:async";
 import "package:flutter/material.dart";
 import "package:skepr_ui/skepr_ui.dart";
 
-void showCustomDialog({
+Future<T?> showCustomDialog<T>({
   required String title,
   String? subtitle,
-  FutureOr<void> Function()? onConfirm,
+  FutureOr<T?> Function()? onConfirm,
   void Function()? onDismiss,
   bool closeOnConfirm = true,
   Widget? child,
   bool easyClose = true,
-}) {
-  void buildDialog(BuildContext ctx) {
-    showGeneralDialog(
+}) async {
+  Future<T?> open(BuildContext ctx) {
+    return showGeneralDialog<T>(
       context: ctx,
       barrierDismissible: easyClose,
       barrierLabel: title,
       transitionDuration: kAnimationFasterDuration,
-      pageBuilder: (context, animation, secondaryAnimation) => CustomDialog(
+      pageBuilder: (context, animation, secondaryAnimation) => CustomDialog<T>(
         title: title,
         subtitle: subtitle,
         onConfirm: onConfirm,
@@ -34,23 +34,28 @@ void showCustomDialog({
           child: FadeTransition(opacity: animation, child: child),
         );
       },
-    ).then((_) {
-      if (onDismiss != null) onDismiss();
+    ).then((value) {
+      onDismiss?.call();
+      return value;
     });
   }
 
   final context = SkeprMaterial.currentContext;
-  if (context != null) {
-    buildDialog(context);
-  } else {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final postFrameContext = SkeprMaterial.currentContext;
-      if (postFrameContext != null) buildDialog(postFrameContext);
-    });
-  }
+  if (context != null) return open(context);
+
+  final completer = Completer<T?>();
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    final postFrameContext = SkeprMaterial.currentContext;
+    if (postFrameContext != null) {
+      completer.complete(await open(postFrameContext));
+    } else {
+      completer.complete(null);
+    }
+  });
+  return completer.future;
 }
 
-class CustomDialog extends StatelessWidget {
+class CustomDialog<T> extends StatelessWidget {
   const CustomDialog({
     super.key,
     required this.title,
@@ -62,7 +67,7 @@ class CustomDialog extends StatelessWidget {
 
   final String title;
   final String? subtitle;
-  final FutureOr<void> Function()? onConfirm;
+  final FutureOr<T?> Function()? onConfirm;
   final bool closeOnConfirm;
   final Widget? child;
 
@@ -113,18 +118,19 @@ class CustomDialog extends StatelessWidget {
                 DialogButton(
                   title: withConfirm ? l10n.cancel : l10n.close,
                   color: withConfirm ? context.error : context.primary,
-                  onPressed: () => context.close(),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-                if (withConfirm) ...[
+                if (withConfirm)
                   DialogButton(
                     title: l10n.confirm,
                     color: context.primary,
                     onPressed: () async {
-                      await onConfirm?.call();
-                      if (closeOnConfirm && context.mounted) context.close();
+                      final result = await onConfirm!.call();
+                      if (closeOnConfirm && context.mounted) {
+                        Navigator.of(context).pop(result);
+                      }
                     },
                   ),
-                ],
               ],
             ),
           ],

@@ -87,8 +87,10 @@ class SkeprMarkdown extends StatefulWidget {
   static final List<md.BlockSyntax> _blockSyntaxes = <md.BlockSyntax>[
     _FastBlockMathSyntax(),
   ];
-  static final List<md.InlineSyntax> _inlineSyntaxes = [
+
+  static final List<md.InlineSyntax> _inlineSyntaxes = <md.InlineSyntax>[
     _FastInlineMathSyntax(),
+    _FastInlineMathParenSyntax(),
   ];
 
   @override
@@ -225,16 +227,14 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     );
 
     _builders = {
-      "display-latex": _FastMathBuilder(
-        display: true,
+      "display-latex": _BlockMathBuilder(
         bg: mathBg,
         bgBox: widget.mathBgBox,
         border: mathBorder,
         color: text,
         fontSize: base + 2,
       ),
-      "inline-latex": _FastMathBuilder(
-        display: false,
+      "inline-latex": _InlineMathBuilder(
         bg: mathBg,
         bgBox: widget.mathBgBox,
         border: mathBorder,
@@ -246,18 +246,15 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     _sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       listIndent: 14,
       orderedListAlign: WrapAlignment.start,
-      tableColumnWidth: const FlexColumnWidth(),
-      tableCellsPadding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 10,
-      ),
+      tableColumnWidth: const IntrinsicColumnWidth(),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       tableBorder: TableBorder.all(color: border, width: 1),
       tableHead: TextStyle(
         fontWeight: FontWeight.bold,
-        fontSize: base,
+        fontSize: base - 1,
         color: text,
       ),
-      tableBody: TextStyle(fontSize: base, color: text),
+      tableBody: TextStyle(fontSize: base - 1, color: text),
       p: ts(base).copyWith(height: 1.6),
       strong: ts(base, FontWeight.bold),
       em: ts(base, null, FontStyle.italic),
@@ -273,10 +270,11 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
       h5: ts(base - 1, FontWeight.w600),
       h6: ts(base - 2, FontWeight.w600),
       code: TextStyle(
-        fontSize: (base - 2).clamp(10.0, 30.0),
-        fontFamily: "monospace",
-        backgroundColor: codeBg,
+        fontSize: base,
+        fontFamily: "serif",
+        fontStyle: FontStyle.italic,
         color: text,
+        backgroundColor: widget.mathBgBox ? mathBg : Colors.transparent,
       ),
       codeblockDecoration: BoxDecoration(
         color: codeBg,
@@ -504,160 +502,78 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
   }
 }
 
-class _FastMathBuilder extends MarkdownElementBuilder {
-  _FastMathBuilder({
-    required this.display,
-    required this.bg,
-    required this.bgBox,
-    required this.border,
-    required this.color,
-    required this.fontSize,
-  });
-
-  final bool display, bgBox;
-  final Color bg, border, color;
-  final double fontSize;
-
-  static final _arabicRegex = RegExp(
-    r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
-  );
-
-  @override
-  Widget? visitElementAfterWithContext(
-    BuildContext context,
-    md.Element element,
-    TextStyle? preferredStyle,
-    TextStyle? parentStyle,
-  ) {
-    final tex = element.textContent;
-
-    if (_arabicRegex.hasMatch(tex) && !tex.contains(r'\')) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        child: Text(
-          tex,
-          style: TextStyle(fontSize: fontSize, color: color),
-          textDirection: TextDirection.rtl,
-        ),
-      );
-    }
-
-    final math = Math.tex(
-      tex,
-      mathStyle: display ? MathStyle.display : MathStyle.text,
-      textStyle: TextStyle(fontSize: fontSize, color: color),
-      onErrorFallback: (_) =>
-          Text(tex, style: const TextStyle(color: Colors.red)),
-    );
-
-    return _wrap(math);
-  }
-
-  Widget _wrap(Widget math) {
-    if (display) {
-      final scroll = Directionality(
-        textDirection: TextDirection.ltr,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: math,
-        ),
-      );
-
-      final Widget content = bgBox
-          ? DecoratedBox(
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: border, width: 0.8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: scroll,
-              ),
-            )
-          : scroll;
-
-      return RepaintBoundary(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: SizedBox(
-            width: double.infinity,
-            child: Align(alignment: Alignment.center, child: content),
-          ),
-        ),
-      );
-    }
-
-    final inlineContent = Directionality(
-      textDirection: TextDirection.ltr,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: math,
-      ),
-    );
-
-    if (!bgBox) return inlineContent;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: border, width: 0.8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          child: inlineContent,
-        ),
-      ),
-    );
-  }
-}
+// ==========================================
+// Inline Syntaxes
+// ==========================================
 
 class _FastInlineMathSyntax extends md.InlineSyntax {
-  _FastInlineMathSyntax() : super(r"\$(?!\s)([^\$\n]+?)(?<!\s)\$");
+  _FastInlineMathSyntax()
+    : super(
+        r'\$(?!\$)(.+?)(?<!\\)\$(?!\$)',
+        startCharacter: 36, // $
+      );
+
   @override
   bool onMatch(md.InlineParser parser, Match match) {
-    final text = match.group(1) ?? "";
-    if (text.isEmpty) return false;
-    parser.addNode(md.Element.text("inline-latex", text));
+    final content = match.group(1)?.trim() ?? '';
+    if (content.isEmpty) return false;
+    parser.addNode(md.Element.text('inline-latex', content));
     return true;
   }
 }
 
-class _FastBlockMathSyntax extends md.BlockSyntax {
-  static final _sameLine = RegExp(r'^\s*\$\$(.+?)\$\$\s*$');
+class _FastInlineMathParenSyntax extends md.InlineSyntax {
+  _FastInlineMathParenSyntax()
+    : super(
+        r'\\\((.+?)\\\)',
+        startCharacter: 92, // \
+      );
 
   @override
-  RegExp get pattern => _sameLine;
+  bool onMatch(md.InlineParser parser, Match match) {
+    final content = match.group(1)?.trim() ?? '';
+    if (content.isEmpty) return false;
+    parser.addNode(md.Element.text('inline-latex', content));
+    return true;
+  }
+}
+
+// ==========================================
+// Block Syntax
+// ==========================================
+
+class _FastBlockMathSyntax extends md.BlockSyntax {
+  @override
+  RegExp get pattern => RegExp(r'^\s*(?:\$\$|\\\[)');
 
   @override
   md.Node? parse(md.BlockParser parser) {
     final line = parser.current.content;
+    final trimmed = line.trimLeft();
+    final isDollar = trimmed.startsWith(r'$$');
+    final isBracket = trimmed.startsWith(r'\[');
+    if (!isDollar && !isBracket) return null;
 
-    final m = _sameLine.firstMatch(line);
-    if (m != null) {
-      final content = m.group(1)?.trim() ?? '';
-      parser.advance();
-      return md.Element.text('display-latex', content);
+    final closer = isDollar ? r'$$' : r'\]';
+    final buffer = StringBuffer();
+
+    // لو المعادلة في سطر واحد (مثال: $$ x = 2 $$)
+    if (trimmed.length > 2) {
+      final endIdx = trimmed.indexOf(closer, 2);
+      if (endIdx != -1) {
+        final content = trimmed.substring(2, endIdx).trim();
+        parser.advance();
+        return md.Element.text('display-latex', content);
+      }
     }
 
-    final trimmed = line.trimLeft();
-    if (!trimmed.startsWith(r'$$')) return null;
-
-    final buffer = StringBuffer();
+    // لو المعادلة متعددة الأسطر
     buffer.write(trimmed.substring(2));
     parser.advance();
 
     while (!parser.isDone) {
       final current = parser.current.content;
-      final endIdx = current.indexOf(r'$$');
+      final endIdx = current.indexOf(closer);
       if (endIdx != -1) {
         buffer.write('\n');
         buffer.write(current.substring(0, endIdx));
@@ -671,5 +587,170 @@ class _FastBlockMathSyntax extends md.BlockSyntax {
 
     final content = buffer.toString().trim();
     return md.Element.text('display-latex', content);
+  }
+}
+
+// ==========================================
+// Math Builders
+// ==========================================
+
+// كلاس مساعد للتحقق من النصوص العربية
+bool _isArabicText(String text) {
+  if (text.contains(r'\')) return false;
+  final regex = RegExp(
+    r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
+  );
+  return regex.hasMatch(text);
+}
+
+class _InlineMathBuilder extends MarkdownElementBuilder {
+  _InlineMathBuilder({
+    required this.bg,
+    required this.bgBox,
+    required this.border,
+    required this.color,
+    required this.fontSize,
+  });
+
+  final bool bgBox;
+  final Color bg, border, color;
+  final double fontSize;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final tex = element.textContent;
+
+    if (_isArabicText(tex)) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        child: Text(
+          tex,
+          style: TextStyle(fontSize: fontSize, color: color),
+          textDirection: TextDirection.rtl,
+        ),
+      );
+    }
+
+    final math = Math.tex(
+      tex,
+      mathStyle: MathStyle.text,
+      textStyle: TextStyle(fontSize: fontSize, color: color),
+      onErrorFallback: (_) =>
+          Text(tex, style: const TextStyle(color: Colors.red)),
+    );
+
+    Widget inline = Directionality(
+      textDirection: TextDirection.ltr,
+      child: math,
+    );
+
+    if (bgBox) {
+      inline = DecoratedBox(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: border, width: 0.8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          child: inline,
+        ),
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: inline,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BlockMathBuilder extends MarkdownElementBuilder {
+  _BlockMathBuilder({
+    required this.bg,
+    required this.bgBox,
+    required this.border,
+    required this.color,
+    required this.fontSize,
+  });
+
+  final bool bgBox;
+  final Color bg, border, color;
+  final double fontSize;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final tex = element.textContent;
+
+    if (_isArabicText(tex)) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            tex,
+            style: TextStyle(fontSize: fontSize, color: color),
+            textDirection: TextDirection.rtl,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    final math = Math.tex(
+      tex,
+      mathStyle: MathStyle.display,
+      textStyle: TextStyle(fontSize: fontSize, color: color),
+      onErrorFallback: (_) =>
+          Text(tex, style: const TextStyle(color: Colors.red)),
+    );
+
+    final scroll = Directionality(
+      textDirection: TextDirection.ltr,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: math,
+      ),
+    );
+
+    final Widget content = bgBox
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: border, width: 0.8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: scroll,
+            ),
+          )
+        : scroll;
+
+    return RepaintBoundary(
+      child: SizedBox(
+        width: double.infinity,
+        child: Align(alignment: Alignment.center, child: content),
+      ),
+    );
   }
 }

@@ -41,6 +41,7 @@ class Input extends StatefulWidget {
     this.keyType = TextInputType.text,
     this.autofillHints,
     this.fullWidth = false,
+    this.actionButtons,
   });
 
   final String? labelText, value;
@@ -68,6 +69,7 @@ class Input extends StatefulWidget {
   final TextInputType keyType;
   final Iterable<String>? autofillHints;
   final bool fullWidth;
+  final List<Widget>? actionButtons;
 
   @override
   State<Input> createState() => _InputState();
@@ -75,6 +77,7 @@ class Input extends StatefulWidget {
 
 class _InputState extends State<Input> {
   bool whiteBG = true;
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +154,7 @@ class _InputState extends State<Input> {
       type: widget.type,
       keyType: widget.keyType,
       autofillHints: widget.autofillHints,
+      actionButtons: widget.actionButtons,
     );
   }
 }
