@@ -16,6 +16,7 @@ class TextIcon extends StatefulWidget {
     this.disabled = false,
     this.markdown = false,
     this.onPressed,
+    this.onLongPress,
     this.withBG,
   });
 
@@ -27,7 +28,7 @@ class TextIcon extends StatefulWidget {
   final String? tooltipTitle;
   final bool hideText, disabled, markdown;
   final bool? withBG;
-  final void Function()? onPressed;
+  final void Function()? onPressed, onLongPress;
 
   @override
   State<TextIcon> createState() => _TextIconState();
@@ -166,8 +167,12 @@ class _TextIconState extends State<TextIcon> {
       );
     }
 
-    if (!widget.disabled && (widget.hideText || widget.onPressed != null)) {
+    if (!widget.disabled &&
+        (widget.hideText ||
+            widget.onPressed != null ||
+            widget.onLongPress != null)) {
       return GestureDetector(
+        onLongPress: () => widget.onLongPress?.call(),
         onTap: () {
           widget.onPressed?.call();
           if (widget.hideText) _handleTap();
