@@ -97,7 +97,9 @@ abstract class DatabaseClient {
         );
         showMessage("تم $title بنجاح", isError: false);
         if (onSuccess != null) onSuccess();
-        if (context.mounted && pop) Navigator.pop(context);
+        if (context.mounted && pop && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
       },
     );
   }

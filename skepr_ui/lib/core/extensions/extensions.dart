@@ -52,11 +52,9 @@ extension NavigationHelpers on BuildContext {
   Future<void> close() async {
     if (!mounted) return;
 
-    final navigator = Navigator.of(this);
-    if (navigator.canPop()) {
+    final navigator = Navigator.maybeOf(this);
+    if (navigator != null && navigator.canPop()) {
       await navigator.maybePop();
-    } else {
-      navigator.popUntil((route) => route.isFirst);
     }
   }
 }
