@@ -28,6 +28,7 @@ class _SelectInputState extends State<SelectInput> {
   static _SelectInputState? _currentOpenState;
   bool isExpanded = false;
   String? _selectedValue;
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -61,19 +62,27 @@ class _SelectInputState extends State<SelectInput> {
     if (mounted && isExpanded) {
       setState(() => isExpanded = false);
     }
+    _searchFocusNode.unfocus();
+    if (_currentOpenState == this) _currentOpenState = null;
   }
 
   void _handleTap() {
     if (isExpanded) {
       _close();
-      if (_currentOpenState == this) _currentOpenState = null;
     } else {
       _currentOpenState?._close();
-
       setState(() {
         isExpanded = true;
         _currentOpenState = this;
       });
+
+      if (widget.items.length > 5) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && isExpanded) {
+            _searchFocusNode.requestFocus();
+          }
+        });
+      }
     }
   }
 
@@ -93,13 +102,15 @@ class _SelectInputState extends State<SelectInput> {
                 ?.name ??
             widget.title;
 
-        void handelSelctTap(SelectEntity item) {
-          final newValue = item.value.toString();
-          widget.onChanged(newValue);
-          state.didChange(newValue);
+        void handleSelectTap(SelectEntity item) {
+          final newValue = item.value.toString().trim();
+          _selectedValue = _selectedValue == newValue ? null : newValue;
+          widget.onChanged(_selectedValue);
+          state.didChange(_selectedValue);
+
+          _searchFocusNode.unfocus();
           setState(() {
             isExpanded = false;
-            _selectedValue = _selectedValue == newValue ? null : newValue;
           });
           if (_currentOpenState == this) _currentOpenState = null;
         }
@@ -115,6 +126,8 @@ class _SelectInputState extends State<SelectInput> {
               bg: state.hasError ? context.error.withValues(alpha: 0.1) : null,
               listData: isExpanded ? widget.items : null,
               searchMatcher: showHeader ? (item) => item.name : null,
+              autoOpenSearch: showHeader && isExpanded,
+              searchFocusNode: _searchFocusNode,
               emptyMessage: "${l10n.nothing} ${widget.title}",
               lengthLimit: kDefultSectionListLimit,
               child: CustomListTile(
@@ -130,7 +143,7 @@ class _SelectInputState extends State<SelectInput> {
                 trailing: item.value.toString() == _selectedValue
                     ? Icon(LucideIcons.check, color: context.primary)
                     : null,
-                onTap: () => handelSelctTap(item),
+                onTap: () => handleSelectTap(item),
               ),
             ),
             if (state.hasError)
@@ -152,6 +165,7 @@ class _SelectInputState extends State<SelectInput> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     if (_currentOpenState == this) _currentOpenState = null;
     super.dispose();
   }

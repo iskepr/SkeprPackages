@@ -44,6 +44,10 @@ class Section<T> extends StatefulWidget {
     this.searchButton,
     this.collapsible = false,
     this.initiallyExpanded = true,
+
+    // ── جديد ──────────────────────────────
+    this.autoOpenSearch = false,
+    this.searchFocusNode,
   }) : assert(title is String || title is Widget || title == null);
 
   final dynamic title;
@@ -68,6 +72,8 @@ class Section<T> extends StatefulWidget {
   final Function(String query)? searchButton;
   final bool collapsible;
   final bool initiallyExpanded;
+  final bool autoOpenSearch;
+  final FocusNode? searchFocusNode;
 
   @override
   State<Section<T>> createState() => _SectionState<T>();
@@ -96,6 +102,8 @@ class _SectionState<T> extends State<Section<T>> {
   bool _dirty = true;
   List<T> _processedData = <T>[];
   List<String>? _searchIndex;
+
+  FocusNode get _effectiveFocusNode => widget.searchFocusNode ?? _focusNode;
 
   bool get _withSearch =>
       widget.searchMatcher != null || widget.searchButton != null;
@@ -128,9 +136,15 @@ class _SectionState<T> extends State<Section<T>> {
     super.initState();
     isExpanded = widget.initiallyExpanded;
 
-    // لو الترتيب الوحيد المتاح هو الافتراضي بالاسم، خليه تصاعدي (A→Z)
     if (widget.sortOptions.isEmpty && _nameExtractor != null) {
       isAscending = true;
+    }
+
+    if (widget.autoOpenSearch && _withSearch) {
+      enableSearch = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _effectiveFocusNode.requestFocus();
+      });
     }
 
     _rebuildFilterOptions();
@@ -139,6 +153,26 @@ class _SectionState<T> extends State<Section<T>> {
   @override
   void didUpdateWidget(covariant Section<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.autoOpenSearch && !oldWidget.autoOpenSearch) {
+      if (_withSearch) {
+        enableSearch = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _effectiveFocusNode.requestFocus();
+        });
+      }
+    } else if (!widget.autoOpenSearch && oldWidget.autoOpenSearch) {
+      if (enableSearch) {
+        enableSearch = false;
+        _searchDebounceTimer?.cancel();
+        _effectiveFocusNode.unfocus();
+        _controller.clear();
+        if (_searchQuery.isNotEmpty) {
+          _searchQuery = "";
+          _dirty = true;
+        }
+      }
+    }
 
     if (!identical(oldWidget.listData, widget.listData) ||
         oldWidget.listData?.length != widget.listData?.length ||
@@ -254,11 +288,11 @@ class _SectionState<T> extends State<Section<T>> {
 
     if (enableSearch) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.requestFocus();
+        if (mounted) _effectiveFocusNode.requestFocus();
       });
     } else {
       _searchDebounceTimer?.cancel();
-      _focusNode.unfocus();
+      _effectiveFocusNode.unfocus();
       _controller.clear();
 
       if (_searchQuery.isNotEmpty) {
@@ -339,7 +373,6 @@ class _SectionState<T> extends State<Section<T>> {
     List<T> result;
     final effectiveSorts = _effectiveSortOptions;
 
-    // 1. Search with Index
     final query = _searchQuery.trim().toLowerCase();
     if (query.isNotEmpty && widget.searchMatcher != null) {
       _ensureSearchIndex(source);
@@ -357,12 +390,10 @@ class _SectionState<T> extends State<Section<T>> {
       result = List<T>.of(source);
     }
 
-    // 2. Filter
     if (filterOptions.isNotEmpty && !selectedFilters.contains(0)) {
       result = _applyFilters(result);
     }
 
-    // 3. Sort (safe on copied list)
     if (effectiveSorts.isNotEmpty && result.length > 1) {
       final sortIndex =
           (selectedSort >= 0 && selectedSort < effectiveSorts.length)
@@ -435,7 +466,7 @@ class _SectionState<T> extends State<Section<T>> {
           if (_withSearch && isExpanded)
             SectionSearchInput(
               enableSearch: enableSearch,
-              focusNode: _focusNode,
+              focusNode: _effectiveFocusNode, // ← التغيير
               controller: _controller,
               disableButton: widget.searchButton == null,
               onChanged: _onSearchChanged,
