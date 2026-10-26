@@ -7,5 +7,14 @@ void showMessage(
   bool isPersistent = false,
   IconData? icon,
 }) => SkeprCore.showMessage;
-void showError(dynamic err, String title, {String? userMessage}) =>
-    SkeprCore.showError;
+void showError(
+  dynamic err,
+  String title, {
+  String? userMessage,
+  StackTrace? stackTrace,
+}) => SkeprCore.showError?.call(
+  err,
+  title,
+  userMessage: userMessage,
+  stackTrace: stackTrace,
+);

@@ -178,7 +178,7 @@ class DataResource<T> {
 
       onSuccess(data);
     } catch (e, t) {
-      showError("$e - $t", cacheKey, userMessage: "تحديث البيانات");
+      showError(e, cacheKey, stackTrace: t);
       onError("حصلت مشكلة في جلب البيانات");
     }
   }

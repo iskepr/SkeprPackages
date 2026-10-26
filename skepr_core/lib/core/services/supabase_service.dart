@@ -75,10 +75,10 @@ class SupabaseService extends DatabaseClient {
       final response = await _supabase.functions.invoke(name, body: body);
       return {"status": response.status, "data": response.data};
     } on FunctionException catch (e, t) {
-      showError("$e - $t", "function_$name");
+      showError(e, "function_$name", stackTrace: t);
       return {"status": e.status, "data": e.details};
     } catch (e, t) {
-      showError("$e - $t", "function_$name");
+      showError(e, "function_$name", stackTrace: t);
       return {"status": 500};
     }
   }
@@ -97,15 +97,11 @@ class SupabaseService extends DatabaseClient {
       return response;
     } on PostgrestException catch (e, t) {
       if (silentException) rethrow;
-      showError(
-        "RPC Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint} | Track: $t",
-        "rpc_$functionName",
-        userMessage: "تنفيذ العملية",
-      );
+      showError(e, "rpc_$functionName", stackTrace: t);
       return null;
     } catch (e, t) {
       if (silentException) rethrow;
-      showError("$e - $t", "rpc_$functionName", userMessage: "تنفيذ العملية");
+      showError(e, "rpc_$functionName", stackTrace: t);
       return null;
     }
   }
@@ -153,16 +149,18 @@ class SupabaseService extends DatabaseClient {
       }
     } on PostgrestException catch (e, t) {
       showError(
-        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint} | Track: $t",
+        e,
         "insert_$tableName",
-        userMessage: userMessage ?? "الإضافة",
+        stackTrace: t,
+        userMessage: userMessage,
       );
       rethrow;
     } catch (e, t) {
       showError(
-        "$e - $t",
+        e,
         "insert_$tableName",
-        userMessage: userMessage ?? "الإضافة",
+        stackTrace: t,
+        userMessage: userMessage,
       );
       rethrow;
     }
@@ -217,7 +215,7 @@ class SupabaseService extends DatabaseClient {
     } catch (e, t) {
       if (silentException) rethrow;
 
-      showError("$e - $t", "select_$tableName", userMessage: "جلب البيانات");
+      showError(e, "select_$tableName", stackTrace: t);
       return options.single || options.maybeSingle ? null : <T>[];
     }
   }
@@ -242,7 +240,7 @@ class SupabaseService extends DatabaseClient {
       if (onSuccess != null) onSuccess();
       return response;
     } catch (e, t) {
-      showError("$e - $t", "update_$tableName", userMessage: "التعديل");
+      showError(e, "update_$tableName", stackTrace: t);
       rethrow;
     }
   }
@@ -288,16 +286,18 @@ class SupabaseService extends DatabaseClient {
       }
     } on PostgrestException catch (e, t) {
       showError(
-        "Postgres Error [${e.code}]: ${e.message} | Details: ${e.details} | Hint: ${e.hint} | Track: $t",
-        "insert_$tableName",
-        userMessage: userMessage ?? "الإضافة",
+        e,
+        "upsert_$tableName",
+        stackTrace: t,
+        userMessage: userMessage,
       );
       rethrow;
     } catch (e, t) {
       showError(
-        "$e - $t",
+        e,
         "upsert_$tableName",
-        userMessage: userMessage ?? "الحفظ",
+        stackTrace: t,
+        userMessage: userMessage,
       );
       rethrow;
     }
@@ -321,7 +321,7 @@ class SupabaseService extends DatabaseClient {
 
       await query;
     } catch (e, t) {
-      showError("$e - $t", "upsert_$tableName", userMessage: "الحذف");
+      showError(e, "delete_$tableName", stackTrace: t);
       rethrow;
     }
   }

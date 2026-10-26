@@ -22,7 +22,12 @@ class SkeprCore {
   })?
   showMessage;
 
-  static void Function(dynamic err, String title, {String? userMessage})?
+  static void Function(
+    dynamic err,
+    String title, {
+    String? userMessage,
+    StackTrace? stackTrace,
+  })?
   showError;
 
   static void Function({
@@ -45,7 +50,13 @@ class SkeprCore {
     })?
     showMessage,
 
-    void Function(dynamic err, String title, {String? userMessage})? showError,
+    void Function(
+      dynamic err,
+      String title, {
+      String? userMessage,
+      StackTrace? stackTrace,
+    })?
+    showError,
 
     void Function({
       required String title,
