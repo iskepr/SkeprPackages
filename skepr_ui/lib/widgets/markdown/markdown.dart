@@ -246,7 +246,7 @@ class _SkeprMarkdownState extends State<SkeprMarkdown> {
     _sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       listIndent: 14,
       orderedListAlign: WrapAlignment.start,
-      tableColumnWidth: const IntrinsicColumnWidth(),
+      tableColumnWidth: const FlexColumnWidth(),
       tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       tableBorder: TableBorder.all(color: border, width: 1),
       tableHead: TextStyle(
@@ -646,7 +646,11 @@ class _InlineMathBuilder extends MarkdownElementBuilder {
 
     Widget inline = Directionality(
       textDirection: TextDirection.ltr,
-      child: math,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: math,
+      ),
     );
 
     if (bgBox) {
