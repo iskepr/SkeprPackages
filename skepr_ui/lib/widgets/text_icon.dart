@@ -116,38 +116,36 @@ class _TextIconState extends State<TextIcon> {
               return SizeTransition(
                 sizeFactor: animation,
                 axis: Axis.horizontal,
-                axisAlignment: 0,
+                axisAlignment: -1,
                 child: FadeTransition(opacity: animation, child: child),
               );
             },
             child: showText
-                ? Center(
-                    child: Padding(
-                      key: const ValueKey("text"),
-                      padding: EdgeInsetsDirectional.only(
-                        start: widget.size * 0.3,
-                      ),
-                      child: widget.markdown
-                          ? SkeprMarkdown(
-                              widget.title,
-                              padding: EdgeInsets.zero,
-                              color: widget.color,
-                              mathBgBox: false,
-                              maxWidth:
-                                  MediaQuery.sizeOf(context).width -
-                                  (widget.size * 4),
-                              fontSize: _responsiveFontSize,
-                            )
-                          : Text(
-                              widget.title,
-                              softWrap: true,
-                              style: TextStyle(
-                                fontSize: widget.size * 0.8,
-                                color: widget.color,
-                                fontFamily: widget.fontFamily,
-                              ),
-                            ),
+                ? Padding(
+                    key: const ValueKey("text"),
+                    padding: EdgeInsetsDirectional.only(
+                      start: widget.size * 0.3,
                     ),
+                    child: widget.markdown
+                        ? SkeprMarkdown(
+                            widget.title,
+                            padding: EdgeInsets.zero,
+                            color: widget.color,
+                            mathBgBox: false,
+                            maxWidth:
+                                MediaQuery.sizeOf(context).width -
+                                (widget.size * 4),
+                            fontSize: _responsiveFontSize,
+                          )
+                        : Text(
+                            widget.title,
+                            softWrap: true,
+                            style: TextStyle(
+                              fontSize: widget.size * 0.8,
+                              color: widget.color,
+                              fontFamily: widget.fontFamily,
+                            ),
+                          ),
                   )
                 : const SizedBox.shrink(key: ValueKey("empty")),
           ),
