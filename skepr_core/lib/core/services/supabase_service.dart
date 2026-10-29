@@ -10,6 +10,85 @@ class SupabaseService extends DatabaseClient {
   Session? get currentSession => _supabase.auth.currentSession;
 
   @override
+  AppAuthUser? get currentUser {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return null;
+    return _mapUser(user);
+  }
+
+  @override
+  Stream<AppAuthStateChange> get onAuthStateChange {
+    return _supabase.auth.onAuthStateChange.map((data) {
+      final event = _mapEvent(data.event);
+      final user = data.session?.user;
+      return AppAuthStateChange(
+        event: event,
+        user: user != null ? _mapUser(user) : null,
+      );
+    });
+  }
+
+  AppAuthUser _mapUser(User user) {
+    return AppAuthUser(
+      id: user.id,
+      email: user.email,
+      userMetadata: user.userMetadata,
+    );
+  }
+
+  AppAuthEvent _mapEvent(AuthChangeEvent event) {
+    switch (event) {
+      case AuthChangeEvent.signedIn:
+        return AppAuthEvent.signedIn;
+      case AuthChangeEvent.signedOut:
+        return AppAuthEvent.signedOut;
+      case AuthChangeEvent.initialSession:
+        return AppAuthEvent.initialSession;
+      case AuthChangeEvent.tokenRefreshed:
+        return AppAuthEvent.tokenRefreshed;
+      case AuthChangeEvent.userUpdated:
+        return AppAuthEvent.userUpdated;
+      case AuthChangeEvent.passwordRecovery:
+        return AppAuthEvent.passwordRecovery;
+      default:
+        return AppAuthEvent.unknown;
+    }
+  }
+
+  @override
+  Future<void> signInWithOAuth({
+    required AuthProvider provider,
+    String? redirectTo,
+  }) async {
+    await _supabase.auth.signInWithOAuth(
+      OAuthProvider.values.firstWhere(
+        (e) => e.name.toLowerCase() == provider.name.toLowerCase(),
+        orElse: () => OAuthProvider.google,
+      ),
+      redirectTo: redirectTo,
+    );
+  }
+
+  @override
+  Future<AppAuthUser?> signInWithIdToken({
+    required AuthProvider provider,
+    required String idToken,
+  }) async {
+    final response = await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.values.firstWhere(
+        (e) => e.name.toLowerCase() == provider.name.toLowerCase(),
+        orElse: () => OAuthProvider.google,
+      ),
+      idToken: idToken,
+    );
+
+    final user = response.user;
+    if (user == null) return null;
+
+    return _mapUser(user);
+  }
+
+  @override
   Future<void> init({
     required String url,
     required String anonKey,
@@ -335,60 +414,108 @@ class SupabaseService extends DatabaseClient {
     for (var filter in filters) {
       switch (filter.operator) {
         case FilterOperator.eq:
-          dynamicQuery = dynamicQuery.eq(filter.field, filter.value);
+          if (filter.value == null) {
+            dynamicQuery = dynamicQuery.filter(filter.field, "is", null);
+          } else {
+            dynamicQuery = dynamicQuery.eq(filter.field, filter.value);
+          }
+          break;
         case FilterOperator.gt:
-          dynamicQuery = dynamicQuery.gt(filter.field, filter.value);
+          if (filter.value != null)
+            dynamicQuery = dynamicQuery.gt(filter.field, filter.value);
+          break;
         case FilterOperator.gte:
-          dynamicQuery = dynamicQuery.gte(filter.field, filter.value);
+          if (filter.value != null)
+            dynamicQuery = dynamicQuery.gte(filter.field, filter.value);
+          break;
         case FilterOperator.lt:
-          dynamicQuery = dynamicQuery.lt(filter.field, filter.value);
+          if (filter.value != null)
+            dynamicQuery = dynamicQuery.lt(filter.field, filter.value);
+          break;
         case FilterOperator.lte:
-          dynamicQuery = dynamicQuery.lte(filter.field, filter.value);
+          if (filter.value != null)
+            dynamicQuery = dynamicQuery.lte(filter.field, filter.value);
+          break;
         case FilterOperator.inList:
-          dynamicQuery = dynamicQuery.filter(filter.field, "in", filter.value);
+          if (filter.value is Iterable &&
+              (filter.value as Iterable).isNotEmpty) {
+            dynamicQuery = dynamicQuery.inFilter(filter.field, filter.value);
+          }
+          break;
         case FilterOperator.iss:
           dynamicQuery = dynamicQuery.filter(filter.field, "is", filter.value);
+          break;
         case FilterOperator.ilike:
-          dynamicQuery = dynamicQuery.ilike(filter.field, "%${filter.value}%");
+          if (filter.value != null) {
+            dynamicQuery = dynamicQuery.ilike(
+              filter.field,
+              "%${filter.value}%",
+            );
+          }
+          break;
+        case FilterOperator.notNull:
+          dynamicQuery = dynamicQuery.filter(filter.field, "not.is", null);
+          break;
+        case FilterOperator.notEq:
+          if (filter.value == null) {
+            dynamicQuery = dynamicQuery.filter(filter.field, "not.is", null);
+          } else {
+            dynamicQuery = dynamicQuery.neq(filter.field, filter.value);
+          }
+          break;
         case FilterOperator.or:
           final expr = filter.subFilters != null
               ? filter.subFilters!.map((f) => f.toPostgrest()).join(",")
-              : filter.value.toString();
-          dynamicQuery = dynamicQuery.or(expr);
+              : filter.value?.toString();
+          if (expr != null && expr.isNotEmpty) {
+            dynamicQuery = dynamicQuery.or(expr);
+          }
+          break;
         case FilterOperator.and:
           final expr = filter.subFilters != null
               ? filter.subFilters!.map((f) => f.toPostgrest()).join(",")
-              : filter.value.toString();
-          dynamicQuery = dynamicQuery.or("and($expr)");
-        case FilterOperator.notNull:
-          dynamicQuery = dynamicQuery.not(filter.field, "is", null);
-        case FilterOperator.notEq:
-          dynamicQuery = dynamicQuery.neq(filter.field, filter.value);
+              : filter.value?.toString();
+          if (expr != null && expr.isNotEmpty) {
+            dynamicQuery = dynamicQuery.or("and($expr)");
+          }
+          break;
         case FilterOperator.not:
           if (filter.subOperator != null) {
             String supabaseOp;
             switch (filter.subOperator!) {
               case FilterOperator.eq:
                 supabaseOp = "eq";
+                break;
               case FilterOperator.inList:
                 supabaseOp = "in";
+                break;
               case FilterOperator.iss:
                 supabaseOp = "is";
+                break;
               default:
                 supabaseOp = filter.value == null ? "is" : "eq";
             }
-            dynamicQuery = dynamicQuery.not(
-              filter.field,
-              supabaseOp,
-              filter.value,
-            );
+            if (filter.value == null) {
+              dynamicQuery = dynamicQuery.filter(
+                filter.field,
+                "not.$supabaseOp",
+                null,
+              );
+            } else {
+              dynamicQuery = dynamicQuery.not(
+                filter.field,
+                supabaseOp,
+                filter.value,
+              );
+            }
           } else {
-            dynamicQuery = dynamicQuery.not(
-              filter.field,
-              filter.value == null ? "is" : "eq",
-              filter.value,
-            );
+            if (filter.value == null) {
+              dynamicQuery = dynamicQuery.filter(filter.field, "not.is", null);
+            } else {
+              dynamicQuery = dynamicQuery.not(filter.field, "eq", filter.value);
+            }
           }
+          break;
       }
     }
 

@@ -2,8 +2,38 @@ import "package:flutter/material.dart";
 import "package:skepr_core/local.dart";
 import "package:skepr_core/skepr_core.dart";
 
+enum AuthProvider { email, google }
+
+enum AppAuthEvent {
+  signedIn,
+  signedOut,
+  tokenRefreshed,
+  userUpdated,
+  passwordRecovery,
+  initialSession,
+  unknown,
+}
+
+class AppAuthUser {
+  final String id;
+  final String? email;
+  final Map<String, dynamic>? userMetadata;
+
+  const AppAuthUser({required this.id, this.email, this.userMetadata});
+}
+
+class AppAuthStateChange {
+  final AppAuthEvent event;
+  final AppAuthUser? user;
+
+  const AppAuthStateChange({required this.event, this.user});
+}
+
 abstract class DatabaseClient {
   dynamic get currentSession;
+
+  AppAuthUser? get currentUser;
+  Stream<AppAuthStateChange> get onAuthStateChange;
 
   Future<void> init({
     required String url,
@@ -24,6 +54,13 @@ abstract class DatabaseClient {
     required String newPassword,
   });
   Future<void> signOut();
+
+  Future<void> signInWithOAuth({required AuthProvider provider, String? redirectTo});
+  Future<AppAuthUser?> signInWithIdToken({
+    required AuthProvider provider,
+    required String idToken,
+  });
+
   Future<Map<String, dynamic>> function(String name, Map<String, dynamic> body);
 
   Future<dynamic> rpc(
