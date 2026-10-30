@@ -93,7 +93,7 @@ class CustomDialog<T> extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: kLargeFont,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
             if (subtitle != null) ...[

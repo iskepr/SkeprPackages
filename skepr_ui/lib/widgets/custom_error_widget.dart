@@ -27,7 +27,7 @@ class CustomErrorWidget extends StatelessWidget {
                 "معلش، حصلت مشكلة في الشاشة دي!",
                 style: TextStyle(
                   fontSize: kMediumFont,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),

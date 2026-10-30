@@ -179,7 +179,7 @@ class _RadioInputState extends State<RadioInput> {
                                     ? context.primary
                                     : context.text,
                                 fontWeight: isSelected
-                                    ? FontWeight.bold
+                                    ? FontWeight.w600
                                     : FontWeight.normal,
                               ),
                             ),

@@ -72,6 +72,7 @@ class Button extends StatelessWidget {
           child: Container(
             width: fullWidth ? double.infinity : null,
             padding: padding,
+            margin: EdgeInsets.symmetric(horizontal: kMediumPadding),
             child: Center(child: _buildContent(context)),
           ),
         ),

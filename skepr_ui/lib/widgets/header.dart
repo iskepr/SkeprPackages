@@ -47,7 +47,8 @@ class Header extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: kLargeFont,
-                          fontWeight: FontWeight.bold,
+                          height: 2,
+                          fontWeight: FontWeight.w600,
                         ),
                       )
                     : title,

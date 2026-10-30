@@ -140,7 +140,7 @@ class CustomListTile extends StatelessWidget {
                       trailing,
                       TextStyle(
                         color: color ?? context.text.withValues(alpha: 0.7),
-                        fontWeight: FontWeight.w100,
+                        fontWeight: FontWeight.w400,
                         fontSize: (kSoSmallFont * 0.9) * size,
                       ),
                     ),

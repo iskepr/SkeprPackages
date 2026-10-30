@@ -79,7 +79,7 @@ class NavPage extends StatelessWidget {
     return Column(
       children: [
         TextButton(
-          onPressed: () => launchUrl(Uri.parse("$kSkeprWebsite?from=app")),
+          onPressed: () => launchUrl(Uri.parse("$kSkeprWebsite?from=Hodor")),
           child: Center(
             child: TextIcon(
               l10n.codeBySkepr,
