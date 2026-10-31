@@ -55,7 +55,10 @@ abstract class DatabaseClient {
   });
   Future<void> signOut();
 
-  Future<void> signInWithOAuth({required AuthProvider provider, String? redirectTo});
+  Future<void> signInWithOAuth({
+    required AuthProvider provider,
+    String? redirectTo,
+  });
   Future<AppAuthUser?> signInWithIdToken({
     required AuthProvider provider,
     required String idToken,
@@ -109,7 +112,7 @@ abstract class DatabaseClient {
     required List<QueryFilter> filters,
     BuildContext? context,
     String? title,
-    VoidCallback? onSuccess,
+    Function(dynamic)? onSuccess,
     bool isRealDelete = true,
     bool pop = false,
   }) async {
@@ -118,8 +121,8 @@ abstract class DatabaseClient {
         tableName,
         filters: filters,
         isRealDelete: isRealDelete,
+        onSuccess: onSuccess,
       );
-      if (onSuccess != null) onSuccess();
       return;
     }
 
@@ -133,7 +136,6 @@ abstract class DatabaseClient {
           isRealDelete: isRealDelete,
         );
         showMessage("تم $title بنجاح", isError: false);
-        if (onSuccess != null) onSuccess();
         if (context.mounted && pop && Navigator.canPop(context)) {
           Navigator.pop(context);
         }
@@ -146,6 +148,7 @@ abstract class DatabaseClient {
     String tableName, {
     required List<QueryFilter> filters,
     required bool isRealDelete,
+    Function(dynamic)? onSuccess,
   });
 }
 

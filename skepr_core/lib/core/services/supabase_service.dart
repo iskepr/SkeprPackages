@@ -387,6 +387,7 @@ class SupabaseService extends DatabaseClient {
     String tableName, {
     required List<QueryFilter> filters,
     required bool isRealDelete,
+    Function(dynamic)? onSuccess,
   }) async {
     try {
       var query = isRealDelete
@@ -398,7 +399,8 @@ class SupabaseService extends DatabaseClient {
 
       query = _applyFilters(query, filters);
 
-      await query;
+      final res = await query;
+      if (onSuccess != null) onSuccess(res);
     } catch (e, t) {
       showError(e, "delete_$tableName", stackTrace: t);
       rethrow;
