@@ -82,6 +82,7 @@ class CustomDialog<T> extends StatelessWidget {
       ),
       child: MyMaterial(
         theme: MyMaterialTheme.glass,
+        whiteBG: false,
         borderRadius: BorderRadius.circular(kLargeBorderRadius),
         padding: const EdgeInsets.all(kLargeBorderRadius * 0.5),
         child: Column(

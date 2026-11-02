@@ -12,13 +12,22 @@ enum ConnectionStateStatus {
   disconnected, // الواي فاي و الداتا مقفولين
 }
 
+const Duration kInternetCheckInterval = Duration(seconds: 30);
+
+const Duration kInternetCheckMemoDuration = Duration(seconds: 1);
+
 Future<bool> get internetIsConnected async =>
     await InternetCheckerService.instance.checkInternetConnection() ==
     ConnectionStateStatus.connected;
 
-class InternetCheckerService {
+class InternetCheckerService with WidgetsBindingObserver {
   final InternetConnection _checker;
   StreamSubscription<dynamic>? _subscription;
+
+  bool _isForeground = true;
+  bool _observerRegistered = false;
+  DateTime? _lastCheckAt;
+  ConnectionStateStatus? _lastResult;
 
   static final InternetCheckerService instance =
       InternetCheckerService._internal();
@@ -26,35 +35,85 @@ class InternetCheckerService {
   factory InternetCheckerService() => instance;
 
   InternetCheckerService._internal({InternetConnection? checker})
-    : _checker = checker ?? InternetConnection() {
+    : _checker = checker ?? _createDefaultChecker() {
     _init();
   }
 
-  /// الـ ValueNotifier اللي شايل الحالة الحالية
+  static InternetConnection _createDefaultChecker() {
+    return InternetConnection.createInstance(
+      checkInterval: kInternetCheckInterval,
+    );
+  }
+
   final ValueNotifier<ConnectionStateStatus> statusNotifier = ValueNotifier(
     ConnectionStateStatus.connected,
   );
 
-  void _init() async {
-    await checkInternetConnection();
+  void _init() {
+    _ensureObserver();
+    unawaited(checkInternetConnection(force: true));
+    _startPolling();
+  }
 
-    _subscription = _checker.onStatusChange.listen((_) async {
-      await checkInternetConnection();
+  void _ensureObserver() {
+    if (_observerRegistered) return;
+    try {
+      WidgetsBinding.instance.addObserver(this);
+      _observerRegistered = true;
+    } catch (e) {
+      debugPrint("[Internet] lifecycle observer unavailable: $e");
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _isForeground = true;
+      _startPolling();
+      unawaited(checkInternetConnection(force: true));
+      return;
+    }
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _isForeground = false;
+      _stopPolling();
+    }
+  }
+
+  void _startPolling() {
+    if (!_isForeground || _subscription != null) return;
+    _subscription = _checker.onStatusChange.listen((_) {
+      unawaited(checkInternetConnection(force: true));
     });
   }
 
-  /// دالة فحص وتحديث الحالة الحالية
-  /// بتفرّق بين noAccess و disconnected عن طريق فحص الهارد وير فعليًا
-  /// (هل في واي فاي/داتا مفتوحة أصلاً ولا لأ) مش بس بيانات الباكدج
-  Future<ConnectionStateStatus> checkInternetConnection() async {
-    final bool hasAccess = await _checker.hasInternetAccess;
+  void _stopPolling() {
+    _subscription?.cancel();
+    _subscription = null;
+  }
 
-    if (hasAccess) {
-      statusNotifier.value = ConnectionStateStatus.connected;
-      return ConnectionStateStatus.connected;
+  Future<ConnectionStateStatus> checkInternetConnection({
+    bool force = false,
+  }) async {
+    _ensureObserver();
+
+    final lastAt = _lastCheckAt;
+    final lastResult = _lastResult;
+    if (!force &&
+        lastResult != null &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < kInternetCheckMemoDuration) {
+      return lastResult;
     }
 
-    final ConnectionStateStatus result = await _resolveNoAccessReason();
+    final bool hasAccess = await _checker.hasInternetAccess;
+    final ConnectionStateStatus result = hasAccess
+        ? ConnectionStateStatus.connected
+        : await _resolveNoAccessReason();
+
+    _lastCheckAt = DateTime.now();
+    _lastResult = result;
     statusNotifier.value = result;
     return result;
   }
@@ -79,14 +138,17 @@ class InternetCheckerService {
   }
 
   void dispose() {
-    _subscription?.cancel();
+    _stopPolling();
+    if (_observerRegistered) {
+      try {
+        WidgetsBinding.instance.removeObserver(this);
+      } catch (_) {}
+      _observerRegistered = false;
+    }
     statusNotifier.dispose();
   }
 }
 
-/// Extension لتسهيل الاستماع لتغيرات الإنترنت من الـ UI مباشرة
-/// بدون أي حاجة تانية - استخدم زي كذا:
-/// MyWidget().listenToInternet(onChange: (context, status) { ... })
 extension InternetListenerExtension on Widget {
   Widget listenToInternet({
     InternetCheckerService? service,
