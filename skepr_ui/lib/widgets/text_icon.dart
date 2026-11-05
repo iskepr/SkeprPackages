@@ -11,6 +11,7 @@ class TextIcon extends StatefulWidget {
     this.size = kMediumFont,
     this.fontFamily,
     this.color,
+    this.style = const TextStyle(),
     this.tooltipTitle,
     this.hideText = false,
     this.disabled = false,
@@ -25,6 +26,7 @@ class TextIcon extends StatefulWidget {
   final double size;
   final String? fontFamily;
   final Color? color;
+  final TextStyle style;
   final String? tooltipTitle;
   final bool hideText, disabled, markdown;
   final bool? withBG;
@@ -140,7 +142,7 @@ class _TextIconState extends State<TextIcon> {
                         : Text(
                             widget.title,
                             softWrap: true,
-                            style: TextStyle(
+                            style: widget.style.copyWith(
                               fontSize: widget.size * 0.8,
                               color: widget.color,
                               fontFamily: widget.fontFamily,
