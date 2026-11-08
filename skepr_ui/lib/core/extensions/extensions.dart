@@ -36,15 +36,19 @@ extension TimeExtension on String {
     );
   }
 
-  DateTime get timeFromHours {
-    if (isEmpty || this == "null") return DateTime(2024, 1, 1);
-    final time = split(":");
+  DateTime timeFromHours([DateTime? date]) {
+    if (this == null || this!.isEmpty || this == "null") {
+      return DateTime(2024, 1, 1);
+    }
+
+    final time = this!.split(":");
     if (time.length < 2) return DateTime(2024, 1, 1);
 
     final hour = int.tryParse(time[0]) ?? 0;
     final minute = int.tryParse(time[1]) ?? 0;
 
-    return DateTime(2024, 1, 1, hour, minute);
+    final targetDate = date ?? DateTime.now();
+    return targetDate.copyWith(hour: hour, minute: minute);
   }
 }
 

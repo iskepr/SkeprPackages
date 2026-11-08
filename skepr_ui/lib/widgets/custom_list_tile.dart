@@ -9,6 +9,7 @@ class CustomListTile extends StatelessWidget {
     this.leading,
     required this.title,
     this.subtitle,
+    this.subContent,
     this.trailing,
     this.color,
     this.size = 1,
@@ -19,6 +20,10 @@ class CustomListTile extends StatelessWidget {
        assert(
          leading == null || leading is String || leading is Widget,
          "leading must be a String or a Widget",
+       ),
+       assert(
+         subContent == null || subContent is String || subContent is Widget,
+         "subContent must be a String or a Widget",
        ),
        assert(
          subtitle == null || subtitle is String || subtitle is Widget,
@@ -34,6 +39,7 @@ class CustomListTile extends StatelessWidget {
   final dynamic leading;
   final dynamic title;
   final dynamic subtitle;
+  final dynamic subContent;
   final dynamic trailing;
   final Color? color;
   final double size;
@@ -48,6 +54,12 @@ class CustomListTile extends StatelessWidget {
       return value as Widget;
     }
 
+    final hasLeading = leading != null;
+    final hasTrailing = trailing != null;
+    final hasSubContent = subContent != null;
+
+    final contentStart = hasLeading ? kDefaultPadding * 2.5 : 0.0;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -59,91 +71,110 @@ class CustomListTile extends StatelessWidget {
           padding: EdgeInsetsDirectional.only(
             top: kSmallPadding * 1.5,
             bottom: kSmallPadding * 1.5,
-            start: leading != null ? 0 : kDefaultPadding,
-            end: kDefaultPadding,
+            start: hasLeading ? 0 : kDefaultPadding,
           ),
-          child: Stack(
-            alignment: SkeprMaterial.isRTL
-                ? Alignment.centerRight
-                : Alignment.centerLeft,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (leading != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: kLargePadding * 0.9,
-                  ),
-                  child: buildWidget(
-                    leading,
-                    TextStyle(fontSize: kMediumFont * size, color: color),
-                  ),
-                ),
-
-              Padding(
-                padding: EdgeInsetsDirectional.only(
-                  start: leading != null ? kDefaultPadding * 2.5 : 0,
-                ),
-                child: Column(
-                  spacing: kSmallPadding * size,
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              Stack(
+                alignment: SkeprMaterial.isRTL
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                children: [
+                  if (hasLeading)
                     Padding(
-                      padding: EdgeInsetsDirectional.only(
-                        end: trailing != null ? kDefaultPadding * 2 : 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: kLargePadding * 0.9,
                       ),
                       child: buildWidget(
-                        title,
-                        context.textTheme.titleMedium!.copyWith(
-                          fontSize: size != 1 ? (kMediumFont * size) : null,
-                          fontWeight: FontWeight.w400,
-                          color: color,
-                        ),
-                      )!,
+                        leading,
+                        TextStyle(fontSize: kMediumFont * size, color: color),
+                      ),
                     ),
-                    if (subtitle != null && subtitle != "")
-                      RepaintBoundary(
-                        child: DefaultTextStyle(
-                          style: TextStyle(
-                            color: color ?? context.text.withValues(alpha: 0.7),
-                            fontSize: kSmallFont * size,
-                            fontFamily: kMainFont,
-                            fontWeight: FontWeight.normal,
+
+                  Padding(
+                    padding: EdgeInsetsDirectional.only(
+                      start: contentStart,
+                      end: hasTrailing ? kDefaultPadding * 2 : 0,
+                    ),
+                    child: Column(
+                      spacing: kSmallPadding * size,
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildWidget(
+                          title,
+                          context.textTheme.titleMedium!.copyWith(
+                            fontSize: size != 1 ? (kMediumFont * size) : null,
+                            fontWeight: FontWeight.w400,
+                            color: color,
                           ),
-                          child: IconTheme(
-                            data: IconThemeData(
-                              color:
-                                  color ?? context.text.withValues(alpha: 0.7),
-                            ),
-                            child: buildWidget(
-                              subtitle,
-                              TextStyle(
+                        )!,
+                        if (subtitle != null && subtitle != "")
+                          RepaintBoundary(
+                            child: DefaultTextStyle(
+                              style: TextStyle(
                                 color:
                                     color ??
                                     context.text.withValues(alpha: 0.7),
                                 fontSize: kSmallFont * size,
+                                fontFamily: kMainFont,
+                                fontWeight: FontWeight.normal,
                               ),
-                            )!,
+                              child: IconTheme(
+                                data: IconThemeData(
+                                  color:
+                                      color ??
+                                      context.text.withValues(alpha: 0.7),
+                                ),
+                                child: buildWidget(
+                                  subtitle,
+                                  TextStyle(
+                                    color:
+                                        color ??
+                                        context.text.withValues(alpha: 0.7),
+                                    fontSize: kSmallFont * size,
+                                  ),
+                                )!,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  if (hasTrailing)
+                    Positioned.fill(
+                      child: Align(
+                        alignment: SkeprMaterial.isRTL
+                            ? const Alignment(-1.0, -0.3)
+                            : const Alignment(1.0, -0.3),
+                        child: Padding(
+                          padding: EdgeInsetsDirectional.only(
+                            end: kDefaultPadding,
+                          ),
+                          child: buildWidget(
+                            trailing,
+                            TextStyle(
+                              color:
+                                  color ?? context.text.withValues(alpha: 0.7),
+                              fontWeight: FontWeight.w400,
+                              fontSize: (kSoSmallFont * 0.9) * size,
+                            ),
                           ),
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
 
-              if (trailing != null)
-                Positioned.fill(
-                  child: Align(
-                    alignment: SkeprMaterial.isRTL
-                        ? const Alignment(-1.0, -0.3)
-                        : const Alignment(1.0, -0.3),
-                    child: buildWidget(
-                      trailing,
-                      TextStyle(
-                        color: color ?? context.text.withValues(alpha: 0.7),
-                        fontWeight: FontWeight.w400,
-                        fontSize: (kSoSmallFont * 0.9) * size,
-                      ),
-                    ),
+              if (hasSubContent)
+                Padding(
+                  padding: EdgeInsetsDirectional.only(top: kMediumPadding),
+                  child: buildWidget(
+                    subContent,
+                    TextStyle(fontSize: kMediumFont * size, color: color),
                   ),
                 ),
             ],
