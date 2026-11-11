@@ -29,13 +29,13 @@ const String kSkeprWebsite = "https://skepr.me";
 SkeprLocalizations get l10n => SkeprMaterial.l10n;
 
 class SkeprMaterial {
-  static BuildContext Function()? _contextGetter;
+  static BuildContext? Function()? _contextGetter;
   static UserData Function()? _userInfoProvider;
   static String Function()? _appVersionProvider;
   static void Function(String screenName)? onScreenTracked;
 
   static void setup({
-    required BuildContext Function() getContext,
+    required BuildContext? Function() getContext,
     UserData Function()? userInfoProvider,
     String Function()? appVersionProvider,
     void Function(String screenName)? onScreenTracked,
@@ -46,12 +46,27 @@ class SkeprMaterial {
     SkeprMaterial.onScreenTracked = onScreenTracked;
   }
 
-  static BuildContext? get currentContext => _contextGetter!();
-  static NavigatorState? get navigator => Navigator.maybeOf(currentContext!);
+  static BuildContext? get currentContext {
+    try {
+      return _contextGetter?.call() ?? messengerKey.currentContext;
+    } catch (_) {
+      return messengerKey.currentContext;
+    }
+  }
+
+  static NavigatorState? get navigator {
+    final context = currentContext;
+    return context == null ? null : Navigator.maybeOf(context);
+  }
+
   static GlobalKey<ScaffoldMessengerState> messengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
-  static TextDirection get textDirection => Directionality.of(currentContext!);
+  static TextDirection get textDirection {
+    final context = currentContext;
+    return context == null ? TextDirection.rtl : Directionality.of(context);
+  }
+
   static bool get isRTL => textDirection == TextDirection.rtl;
 
   static SkeprLocalizations get l10n => SkeprLocalizations.of(currentContext!)!;

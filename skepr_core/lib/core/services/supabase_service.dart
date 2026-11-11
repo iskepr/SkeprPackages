@@ -77,6 +77,7 @@ class SupabaseService extends DatabaseClient {
   // ── Retry / JWT ──────────────────────────────────────────────────────────
 
   static const int _kMaxAttempts = 3;
+  static Future<void>? _refreshInFlight;
 
   /// Failures a retry can plausibly fix.
   ///
@@ -98,6 +99,44 @@ class SupabaseService extends DatabaseClient {
   static bool _isExpiredJwt(Object e) =>
       e is PostgrestException &&
       (e.code == "PGRST303" || e.message.toLowerCase().contains("jwt expired"));
+
+  static Future<void> _refreshOnce() {
+    final running = _refreshInFlight;
+    if (running != null) return running;
+    final future = _performRefresh();
+    _refreshInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_refreshInFlight, future)) _refreshInFlight = null;
+    });
+  }
+
+  static Future<void> _performRefresh() async {
+    try {
+      final refreshed = await _supabase.auth.refreshSession().timeout(
+        const Duration(seconds: 15),
+      );
+      if (refreshed.session != null) return;
+      debugPrint("[auth] refresh returned no session");
+    } on AuthException catch (e) {
+      if (_isDefinitiveRefreshFailure(e)) {
+        debugPrint("[auth] refresh token rejected (${e.code ?? e.statusCode})");
+        await _supabase.auth.signOut(scope: SignOutScope.local);
+      }
+      rethrow;
+    }
+  }
+
+  static bool _isDefinitiveRefreshFailure(AuthException e) {
+    final status = int.tryParse(e.statusCode ?? "");
+    if (status == 429 || (status != null && status >= 500)) return false;
+    if (status == 401 || status == 403) return true;
+    const definitiveCodes = {
+      "refresh_token_not_found",
+      "invalid_grant",
+      "session_not_found",
+    };
+    return definitiveCodes.contains(e.code?.toLowerCase());
+  }
 
   Future<T> _withRetry<T>(
     Future<T> Function() action, {
@@ -124,8 +163,7 @@ class SupabaseService extends DatabaseClient {
     } catch (e) {
       if (!_isExpiredJwt(e)) rethrow;
       debugPrint("[auth] JWT expired, refreshing session");
-      final refreshed = await _supabase.auth.refreshSession();
-      if (refreshed.session == null) rethrow;
+      await _refreshOnce();
       return action();
     }
   }

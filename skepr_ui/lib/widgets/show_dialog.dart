@@ -55,7 +55,7 @@ Future<T?> showCustomDialog<T>({
   return completer.future;
 }
 
-class CustomDialog<T> extends StatelessWidget {
+class CustomDialog<T> extends StatefulWidget {
   const CustomDialog({
     super.key,
     required this.title,
@@ -72,8 +72,29 @@ class CustomDialog<T> extends StatelessWidget {
   final Widget? child;
 
   @override
+  State<CustomDialog<T>> createState() => _CustomDialogState<T>();
+}
+
+class _CustomDialogState<T> extends State<CustomDialog<T>> {
+  bool _isClosing = false;
+
+  void _close([T? result]) {
+    if (_isClosing || !mounted) return;
+    if (ModalRoute.of(context)?.isActive != true) return;
+    _isClosing = true;
+    Navigator.of(context).pop(result);
+  }
+
+  Future<void> _confirm() async {
+    final onConfirm = widget.onConfirm;
+    if (onConfirm == null || _isClosing) return;
+    final result = await onConfirm();
+    if (widget.closeOnConfirm) _close(result);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final withConfirm = onConfirm != null;
+    final withConfirm = widget.onConfirm != null;
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -90,17 +111,17 @@ class CustomDialog<T> extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              title,
+              widget.title,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: kLargeFont,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (subtitle != null) ...[
+            if (widget.subtitle != null) ...[
               const SizedBox(height: kSmallPadding),
               Text(
-                subtitle!,
+                widget.subtitle!,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: kSmallFont,
@@ -108,9 +129,9 @@ class CustomDialog<T> extends StatelessWidget {
                 ),
               ),
             ],
-            if (child != null) ...[
+            if (widget.child != null) ...[
               const SizedBox(height: kMediumPadding),
-              child!,
+              widget.child!,
             ],
             const SizedBox(height: kMediumPadding),
             Row(
@@ -119,18 +140,13 @@ class CustomDialog<T> extends StatelessWidget {
                 DialogButton(
                   title: withConfirm ? l10n.cancel : l10n.close,
                   color: withConfirm ? context.error : context.primary,
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: _close,
                 ),
                 if (withConfirm)
                   DialogButton(
                     title: l10n.confirm,
                     color: context.primary,
-                    onPressed: () async {
-                      final result = await onConfirm!.call();
-                      if (closeOnConfirm && context.mounted) {
-                        Navigator.of(context).pop(result);
-                      }
-                    },
+                    onPressed: _confirm,
                   ),
               ],
             ),
