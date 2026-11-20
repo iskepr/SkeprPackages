@@ -6,6 +6,7 @@ class BarButton extends StatelessWidget {
     super.key,
     required this.icon,
     this.title,
+    this.color,
     required this.onPressed,
     this.isActive = false,
     required this.buttonsLength,
@@ -13,13 +14,15 @@ class BarButton extends StatelessWidget {
 
   final IconData icon;
   final String? title;
+  final Color? color;
   final Function() onPressed;
   final bool isActive;
   final int buttonsLength;
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? context.text.withValues(alpha: 0.8) : Colors.grey;
+    final finalColor =
+        color ?? (isActive ? context.text.withValues(alpha: 0.8) : Colors.grey);
 
     return GestureDetector(
       onTap: onPressed,
@@ -46,7 +49,7 @@ class BarButton extends StatelessWidget {
                 icon,
                 textDirection: TextDirection.ltr,
                 size: kSoLargeFont,
-                color: color,
+                color: finalColor,
               ),
             ),
             if (title != null)
@@ -59,7 +62,7 @@ class BarButton extends StatelessWidget {
                         child: Text(
                           title!,
                           style: TextStyle(
-                            color: color,
+                            color: finalColor,
                             fontSize: kSoLargeFont / 2,
                           ),
                         ),

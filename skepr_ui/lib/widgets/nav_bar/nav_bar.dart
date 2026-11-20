@@ -80,6 +80,7 @@ class NavBar extends StatelessWidget {
                 return BarButton(
                   icon: entity.icon,
                   title: entity.title,
+                  color: entity.color,
                   buttonsLength: leftItems.length,
                   isActive: entity.isWidget && currentIndex == actualIndex,
                   onPressed: () => handleTap(entity, actualIndex),

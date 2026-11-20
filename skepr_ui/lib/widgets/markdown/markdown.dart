@@ -591,16 +591,134 @@ class _FastBlockMathSyntax extends md.BlockSyntax {
 }
 
 // ==========================================
-// Math Builders
+// Math Builders (Arabic-aware)
 // ==========================================
 
-// كلاس مساعد للتحقق من النصوص العربية
-bool _isArabicText(String text) {
-  if (text.contains(r'\')) return false;
-  final regex = RegExp(
-    r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
+final RegExp _arabicChar = RegExp(
+  r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
+);
+
+// تتابع حروف عربية (مع مسافات وعلامات ترقيم عربية بينها)
+final RegExp _arabicRun = RegExp(
+  r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+'
+  r'(?:[ \u00A0\u060C\u061B\u061F]+[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)*',
+);
+
+// \text{عربي} -> عربي (عشان يتعرض كنص عادي)
+final RegExp _textWrapped = RegExp(
+  r'\\(?:text|mbox|textbf|textit|mathrm)\{([^{}]*[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF][^{}]*)\}',
+);
+
+// أجزاء اللاتكس الحقيقية بس: \frac{a}{b} , \pi , x^2 , a_{n}
+final RegExp _mathAtom = RegExp(
+  r'(?:\\[a-zA-Z]+(?:\{[^{}]*\})*|[A-Za-z0-9]+[\^_](?:\{[^{}]*\}|[A-Za-z0-9]))'
+  r'(?:[\^_](?:\{[^{}]*\}|[A-Za-z0-9]))*',
+);
+
+class _TexPart {
+  const _TexPart(this.text, this.isMath);
+  final String text;
+  final bool isMath;
+}
+
+/// بيقسم النص لنص عادي + أجزاء ماث. النص العادي (عربي + + = ( ) " ...)
+/// بيفضل في نفس الـ Text عشان ترتيب الـ RTL يطلع صح.
+List<_TexPart> _splitTex(String input) {
+  final tex = input.replaceAllMapped(_textWrapped, (m) => m.group(1)!);
+  final parts = <_TexPart>[];
+  var last = 0;
+
+  for (final m in _mathAtom.allMatches(tex)) {
+    if (m.start > last) {
+      parts.add(_TexPart(tex.substring(last, m.start), false));
+    }
+    // أي عربي جوه الأقواس بيتلف بـ \text{}
+    final atom = m
+        .group(0)!
+        .replaceAllMapped(_arabicRun, (a) => '\\text{${a.group(0)}}');
+    parts.add(_TexPart(atom, true));
+    last = m.end;
+  }
+  if (last < tex.length) parts.add(_TexPart(tex.substring(last), false));
+  return parts;
+}
+
+Widget _buildMixedMath({
+  required String tex,
+  required bool display,
+  required Color color,
+  required double fontSize,
+  required bool bgBox,
+  required Color bg,
+  required Color border,
+}) {
+  final textStyle = TextStyle(fontSize: fontSize, color: color);
+
+  Widget mathWidget(String t) => Directionality(
+    textDirection: TextDirection.ltr,
+    child: Math.tex(
+      t,
+      mathStyle: display ? MathStyle.display : MathStyle.text,
+      textStyle: textStyle,
+      settings: TexParserSettings(strict: Strict.ignore),
+      onErrorFallback: (_) =>
+          Text(t, style: const TextStyle(color: Colors.red)),
+    ),
   );
-  return regex.hasMatch(text);
+
+  Widget content;
+
+  if (!_arabicChar.hasMatch(tex)) {
+    // ماث عادي من غير عربي
+    final math = mathWidget(tex);
+    content = display
+        ? SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: math,
+          )
+        : FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: math,
+          );
+  } else {
+    final parts = _splitTex(tex);
+    content = Text.rich(
+      TextSpan(
+        style: textStyle,
+        children: [
+          for (final p in parts)
+            if (p.isMath)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: mathWidget(p.text),
+              )
+            else
+              TextSpan(text: p.text),
+        ],
+      ),
+      textDirection: SkeprMarkdown.getAutoDirection(tex),
+      textAlign: display ? TextAlign.center : TextAlign.start,
+    );
+  }
+
+  if (bgBox) {
+    content = DecoratedBox(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(display ? 8 : 6),
+        border: Border.all(color: border, width: 0.8),
+      ),
+      child: Padding(
+        padding: display
+            ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
+            : const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        child: content,
+      ),
+    );
+  }
+  return content;
 }
 
 class _InlineMathBuilder extends MarkdownElementBuilder {
@@ -623,49 +741,15 @@ class _InlineMathBuilder extends MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) {
-    final tex = element.textContent;
-
-    if (_isArabicText(tex)) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        child: Text(
-          tex,
-          style: TextStyle(fontSize: fontSize, color: color),
-          textDirection: TextDirection.rtl,
-        ),
-      );
-    }
-
-    final math = Math.tex(
-      tex,
-      mathStyle: MathStyle.text,
-      textStyle: TextStyle(fontSize: fontSize, color: color),
-      onErrorFallback: (_) =>
-          Text(tex, style: const TextStyle(color: Colors.red)),
+    final inline = _buildMixedMath(
+      tex: element.textContent,
+      display: false,
+      color: color,
+      fontSize: fontSize,
+      bgBox: bgBox,
+      bg: bg,
+      border: border,
     );
-
-    Widget inline = Directionality(
-      textDirection: TextDirection.ltr,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: math,
-      ),
-    );
-
-    if (bgBox) {
-      inline = DecoratedBox(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: border, width: 0.8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          child: inline,
-        ),
-      );
-    }
 
     return Text.rich(
       TextSpan(
@@ -703,52 +787,15 @@ class _BlockMathBuilder extends MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) {
-    final tex = element.textContent;
-
-    if (_isArabicText(tex)) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            tex,
-            style: TextStyle(fontSize: fontSize, color: color),
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    final math = Math.tex(
-      tex,
-      mathStyle: MathStyle.display,
-      textStyle: TextStyle(fontSize: fontSize, color: color),
-      onErrorFallback: (_) =>
-          Text(tex, style: const TextStyle(color: Colors.red)),
+    final content = _buildMixedMath(
+      tex: element.textContent,
+      display: true,
+      color: color,
+      fontSize: fontSize,
+      bgBox: bgBox,
+      bg: bg,
+      border: border,
     );
-
-    final scroll = Directionality(
-      textDirection: TextDirection.ltr,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: math,
-      ),
-    );
-
-    final Widget content = bgBox
-        ? DecoratedBox(
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: border, width: 0.8),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: scroll,
-            ),
-          )
-        : scroll;
 
     return RepaintBoundary(
       child: SizedBox(
