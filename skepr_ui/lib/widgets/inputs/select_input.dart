@@ -140,6 +140,7 @@ class _SelectInputState extends State<SelectInput> {
               ),
               itemBuilder: (c, item, index) => CustomListTile(
                 title: item.name,
+                subtitle: item.description,
                 trailing: item.value.toString() == _selectedValue
                     ? Icon(LucideIcons.check, color: context.primary)
                     : null,
