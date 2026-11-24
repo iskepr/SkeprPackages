@@ -1,9 +1,13 @@
+import "dart:async";
 import "package:flutter/material.dart";
 import "package:skepr_ui/skepr_ui.dart";
 
 export "package:toastification/toastification.dart";
 
 enum MessageType { info, success, warning, error }
+
+ToastificationItem? _activeToast;
+Timer? _debounceTimer;
 
 void showMessage(
   String msg, {
@@ -21,8 +25,14 @@ void showMessage(
           ? MessageType.success
           : MessageType.info);
 
-  debugPrint("${resolved.name}: $msg");
-  WidgetsBinding.instance.addPostFrameCallback((_) {
+  debugPrint("${resolved.name}: $msg ${DateTime.now()}");
+  if (!StackTrace.current.toString().contains("error_handle")) {
+    debugPrintStack(stackTrace: StackTrace.current, maxFrames: 4);
+  }
+
+  _debounceTimer?.cancel();
+
+  _debounceTimer = Timer(const Duration(milliseconds: 50), () {
     final context = SkeprMaterial.currentContext;
     if (context == null || !context.mounted) {
       debugPrint("[showMessage] dropped, no mounted context: $msg");
@@ -32,7 +42,7 @@ void showMessage(
     final bgColor = switch (resolved) {
       MessageType.error => context.error,
       MessageType.success => context.success,
-      MessageType.warning => context.warning, // لو موجود في الـ theme
+      MessageType.warning => context.warning,
       MessageType.info => context.background,
     };
 
@@ -46,8 +56,13 @@ void showMessage(
         };
 
     try {
-      hideMessage();
-      toastification.show(
+      if (_activeToast != null) {
+        toastification.dismiss(_activeToast!, showRemoveAnimation: false);
+        _activeToast = null;
+      }
+      toastification.dismissAll(delayForAnimation: false);
+
+      _activeToast = toastification.show(
         context: context,
         type: switch (resolved) {
           MessageType.error => ToastificationType.error,
@@ -80,4 +95,11 @@ void showMessage(
   });
 }
 
-void hideMessage() => toastification.dismissAll();
+void hideMessage() {
+  _debounceTimer?.cancel();
+  if (_activeToast != null) {
+    toastification.dismiss(_activeToast!, showRemoveAnimation: false);
+    _activeToast = null;
+  }
+  toastification.dismissAll(delayForAnimation: false);
+}

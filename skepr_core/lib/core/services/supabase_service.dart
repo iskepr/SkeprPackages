@@ -183,7 +183,6 @@ class SupabaseService extends DatabaseClient {
       return result;
     } catch (e, t) {
       if (silentException) rethrow;
-      showError(e, source, stackTrace: t, userMessage: userMessage);
       if (onError != null) return onError(e);
       rethrow;
     }

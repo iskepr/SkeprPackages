@@ -12,9 +12,14 @@ void showError(
   String title, {
   String? userMessage,
   StackTrace? stackTrace,
-}) => SkeprCore.showError?.call(
-  err,
-  title,
-  userMessage: userMessage,
-  stackTrace: stackTrace,
-);
+}) {
+  debugPrint("error Stack show error");
+  debugPrintStack(stackTrace: StackTrace.current, maxFrames: 4);
+  debugPrint("--------------------------------------");
+  return SkeprCore.showError?.call(
+    err,
+    title,
+    userMessage: userMessage,
+    stackTrace: stackTrace,
+  );
+}
