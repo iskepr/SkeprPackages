@@ -76,7 +76,7 @@ class SupabaseService extends DatabaseClient {
 
   // ── Retry / JWT ──────────────────────────────────────────────────────────
 
-  static const int _kMaxAttempts = 3;
+  static const int _kMaxAttempts = 2;
   static Future<void>? _refreshInFlight;
 
   /// Failures a retry can plausibly fix.
@@ -262,6 +262,9 @@ class SupabaseService extends DatabaseClient {
     url: url,
     anonKey: anonKey,
     authOptions: const FlutterAuthClientOptions(autoRefreshToken: true),
+    postgrestOptions: const PostgrestClientOptions(
+      requestTimeout: Duration(seconds: 8),
+    ),
     headers: headers,
   );
 

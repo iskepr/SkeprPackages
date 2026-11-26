@@ -15,6 +15,7 @@ enum ConnectionStateStatus {
 const Duration kInternetCheckInterval = Duration(seconds: 30);
 
 const Duration kInternetCheckMemoDuration = Duration(seconds: 1);
+const Duration kInternetCheckTimeout = Duration(seconds: 5);
 
 Future<bool> get internetIsConnected async =>
     await InternetCheckerService.instance.checkInternetConnection() ==
@@ -28,6 +29,7 @@ class InternetCheckerService with WidgetsBindingObserver {
   bool _observerRegistered = false;
   DateTime? _lastCheckAt;
   ConnectionStateStatus? _lastResult;
+  Future<ConnectionStateStatus>? _checkInFlight;
 
   static final InternetCheckerService instance =
       InternetCheckerService._internal();
@@ -107,10 +109,27 @@ class InternetCheckerService with WidgetsBindingObserver {
       return lastResult;
     }
 
-    final bool hasAccess = await _checker.hasInternetAccess;
-    final ConnectionStateStatus result = hasAccess
+    final running = _checkInFlight;
+    if (running != null) return running;
+
+    final check = _performInternetCheck();
+    _checkInFlight = check;
+    return check.whenComplete(() {
+      if (identical(_checkInFlight, check)) _checkInFlight = null;
+    });
+  }
+
+  Future<ConnectionStateStatus> _performInternetCheck() async {
+    final hasAccess = await _checker.hasInternetAccess.timeout(
+      kInternetCheckTimeout,
+      onTimeout: () => false,
+    );
+    final result = hasAccess
         ? ConnectionStateStatus.connected
-        : await _resolveNoAccessReason();
+        : await _resolveNoAccessReason().timeout(
+            kInternetCheckTimeout,
+            onTimeout: () => ConnectionStateStatus.noAccess,
+          );
 
     _lastCheckAt = DateTime.now();
     _lastResult = result;
