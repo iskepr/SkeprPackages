@@ -12,11 +12,19 @@ class RadioInput extends StatefulWidget {
     this.disabled = false,
     this.hasBorder = false,
     this.whiteBG = true,
+    this.height = 38,
+    this.bg,
+    this.margin,
+    this.validate,
   });
 
   final List<SelectEntity> items;
   final dynamic value;
   final bool disabled, hasBorder, whiteBG;
+  final double height;
+  final Color? bg;
+  final EdgeInsets? margin;
+  final String? Function(String?)? validate;
   final Function(dynamic) onChanged;
 
   @override
@@ -25,6 +33,7 @@ class RadioInput extends StatefulWidget {
 
 class _RadioInputState extends State<RadioInput> {
   int _selectedValue = -1;
+  final _fieldKey = GlobalKey<FormFieldState<String>>();
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -48,8 +57,11 @@ class _RadioInputState extends State<RadioInput> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value != widget.value) {
       _updateSelectedIndex();
-
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _fieldKey.currentState?.didChange(widget.value?.toString());
+        _scrollToSelected();
+      });
     }
   }
 
@@ -59,11 +71,14 @@ class _RadioInputState extends State<RadioInput> {
     );
   }
 
+  int _itemWeight(SelectEntity item) =>
+      max(item.name.length, 1) + (item.icon != null ? 3 : 0);
+
   Map<String, double> _calculateLayout(double maxWidth) {
     const double paddingVal = 2;
     final int totalFlex = widget.items.fold(
       0,
-      (sum, item) => sum + item.name.length,
+      (sum, item) => sum + _itemWeight(item),
     );
     final double innerContainerWidth = maxWidth - (paddingVal * 4);
     final double requiredWidth = totalFlex * 10;
@@ -75,11 +90,11 @@ class _RadioInputState extends State<RadioInput> {
     if (_selectedValue != -1 && totalFlex > 0) {
       int flexBefore = 0;
       for (int i = 0; i < _selectedValue; i++) {
-        flexBefore += widget.items[i].name.length;
+        flexBefore += _itemWeight(widget.items[i]);
       }
       selectorStart = (flexBefore / totalFlex) * scrollableWidth;
       selectorWidth =
-          (widget.items[_selectedValue].name.length / totalFlex) *
+          (_itemWeight(widget.items[_selectedValue]) / totalFlex) *
           scrollableWidth;
     }
 
@@ -118,80 +133,143 @@ class _RadioInputState extends State<RadioInput> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final layout = _calculateLayout(constraints.maxWidth);
+    return FormField<String>(
+      key: _fieldKey,
+      validator: widget.validate,
+      initialValue: widget.value?.toString(),
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      builder: (fieldState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final layout = _calculateLayout(constraints.maxWidth);
 
-        return MyMaterial(
-          height: 35,
-          width: constraints.maxWidth,
-          padding: const EdgeInsets.all(4),
-          whiteBG: widget.whiteBG,
-          hasBorder: widget.hasBorder,
-          hasShadow: false,
-          borderRadius: BorderRadius.circular(50),
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: SizedBox(
-              width: layout["scrollableWidth"],
-              child: Stack(
-                children: [
-                  if (_selectedValue != -1)
-                    AnimatedPositionedDirectional(
-                      start: layout["start"]!,
-                      width: layout["width"]!,
-                      top: 0,
-                      bottom: 0,
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeInOut,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: context.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                      ),
-                    ),
-                  Row(
-                    children: List.generate(widget.items.length, (index) {
-                      final item = widget.items[index];
-                      final isSelected = _selectedValue == index;
-
-                      return Expanded(
-                        flex: item.name.length,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onTap: () {
-                            if (widget.disabled) return;
-                            setState(() => _selectedValue = index);
-                            widget.onChanged(item.value);
-                          },
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: Text(
-                              item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: kSmallFont,
-                                color: isSelected
-                                    ? context.primary
-                                    : context.text,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
+                return MyMaterial(
+                  height: widget.height,
+                  width: constraints.maxWidth,
+                  margin: widget.margin,
+                  padding: const EdgeInsets.all(4),
+                  whiteBG: widget.whiteBG,
+                  hasBorder: widget.hasBorder,
+                  hasShadow: false,
+                  bg:
+                      widget.bg ??
+                      (fieldState.hasError
+                          ? context.error.withValues(alpha: 0.1)
+                          : null),
+                  borderRadius: BorderRadius.circular(50),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: SizedBox(
+                      width: layout["scrollableWidth"],
+                      child: Stack(
+                        children: [
+                          if (_selectedValue != -1)
+                            AnimatedPositionedDirectional(
+                              start: layout["start"]!,
+                              width: layout["width"]!,
+                              top: 0,
+                              bottom: 0,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: context.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(50),
+                                ),
                               ),
                             ),
+                          Row(
+                            children: List.generate(widget.items.length, (
+                              index,
+                            ) {
+                              final item = widget.items[index];
+                              final isSelected = _selectedValue == index;
+
+                              return Expanded(
+                                flex: _itemWeight(item),
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.translucent,
+                                  onTap: () {
+                                    if (widget.disabled) return;
+                                    setState(() => _selectedValue = index);
+                                    fieldState.didChange(
+                                      item.value?.toString(),
+                                    );
+                                    widget.onChanged(item.value);
+                                  },
+                                  child: Container(
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      spacing: 5,
+                                      children: [
+                                        if (item.icon != null)
+                                          Icon(
+                                            item.icon,
+                                            size: kSmallFont + 3,
+                                            color: isSelected
+                                                ? context.primary
+                                                : context.text,
+                                          ),
+                                        Flexible(
+                                          child: Text(
+                                            item.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: kSmallFont,
+                                              color: isSelected
+                                                  ? context.primary
+                                                  : context.text,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
                           ),
-                        ),
-                      );
-                    }),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
-          ),
+            if (fieldState.hasError)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  kSmallPadding,
+                  4,
+                  kSmallPadding,
+                  0,
+                ),
+                child: Text(
+                  fieldState.errorText ?? "",
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: kSoSmallFont,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

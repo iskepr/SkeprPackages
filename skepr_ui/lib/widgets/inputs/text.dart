@@ -119,8 +119,12 @@ class _TextFState extends State<TextF> {
                                 : Colors.transparent),
                         errorText: null,
                         errorStyle: const TextStyle(height: 0, fontSize: 0),
+                        suffixIconConstraints: widget.isPass
+                            ? const BoxConstraints()
+                            : null,
                         suffixIcon: widget.isPass
                             ? IconButton(
+                                visualDensity: VisualDensity.compact,
                                 icon: Icon(
                                   _obscureText
                                       ? LucideIcons.eye
